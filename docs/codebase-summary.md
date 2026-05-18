@@ -1,19 +1,19 @@
 # GoClaw CLI - Codebase Summary
 
-**Generated from:** `repomix-output.xml` (2026-04-15)
-**Phase Status:** P0-P4 Complete (AI-First Expansion)
-**Total Files:** 65+
-**Estimated Tokens:** 72,000+
+**Generated from:** `repomix-output.xml` (2026-04-15), updated manually 2026-05-18
+**Phase Status:** P0-P4 Complete (AI-First Expansion); Super Admin API Parity Complete
+**Total Files:** 80+
+**Estimated Tokens:** 80,000+
 **Total Size:** 220+ KB
 
 ---
 
 ## Overview
 
-GoClaw CLI is a production-ready Go application (3,500+ lines) providing comprehensive command-line management for GoClaw AI agent gateway servers. Built with Cobra framework, it supports 30 command groups across 50+ command files with dual modes: interactive (human) and automation (CI/agent). Phases 0-4 (AI-first expansion) add AI ergonomics, admin/ops, migration, vault, and advanced agent/team/memory support.
+GoClaw CLI is a production-ready Go application providing comprehensive command-line management for GoClaw AI agent gateway servers. Built with Cobra framework, it supports 30+ command groups across modular command files with dual modes: interactive (human) and automation (CI/agent). Phases 0-4 (AI-first expansion) add AI ergonomics, admin/ops, migration, vault, and advanced agent/team/memory support. The 2026-05-18 super-admin parity work adds gateway upgrade, package updates, workstations, webhooks, MCP user credentials, secure env reveal, media/TTS/storage/channel fillers, and focused route-contract tests.
 
 **Key Metrics:**
-- **50+ command files** in `cmd/` (modularized for maintainability)
+- **70+ command files** in `cmd/` (modularized for maintainability)
 - **7 internal packages** (client, config, output, tui) with Phase 0 AI additions
 - **4 core dependencies** (cobra, websocket, yaml, term)
 - **No ORM, no external CLIs** — single statically-linked binary
@@ -501,7 +501,7 @@ Each level overrides the previous.
 
 **Phase 1-9 (Complete):**
 - 28 command groups
-- Full API coverage
+- Broad operational API coverage
 - Dual mode (interactive + automation)
 - Multi-profile support
 - WebSocket streaming

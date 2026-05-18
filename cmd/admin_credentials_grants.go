@@ -126,11 +126,34 @@ var adminCredGrantsDeleteCmd = &cobra.Command{
 	},
 }
 
+var adminCredGrantsEnvRevealCmd = &cobra.Command{
+	Use:   "env-reveal <credID> <grantID>",
+	Short: "Reveal decrypted grant environment variables",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		showSecrets, _ := cmd.Flags().GetBool("show-secrets")
+		if !cfg.Yes || !showSecrets {
+			return fmt.Errorf("env reveal requires both --yes and --show-secrets")
+		}
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		data, err := c.Post("/v1/cli-credentials/"+args[0]+"/agent-grants/"+args[1]+"/env:reveal", nil)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
+
 func init() {
 	adminCredGrantsCreateCmd.Flags().String("body", "", "Grant payload as JSON object (required)")
 	_ = adminCredGrantsCreateCmd.MarkFlagRequired("body")
 	adminCredGrantsUpdateCmd.Flags().String("body", "", "Update payload as JSON object (required)")
 	_ = adminCredGrantsUpdateCmd.MarkFlagRequired("body")
+	adminCredGrantsEnvRevealCmd.Flags().Bool("show-secrets", false, "Print decrypted env values")
 
 	adminCredGrantsCmd.AddCommand(
 		adminCredGrantsListCmd,
@@ -138,6 +161,7 @@ func init() {
 		adminCredGrantsGetCmd,
 		adminCredGrantsUpdateCmd,
 		adminCredGrantsDeleteCmd,
+		adminCredGrantsEnvRevealCmd,
 	)
 	adminCredentialsCmd.AddCommand(adminCredGrantsCmd)
 }

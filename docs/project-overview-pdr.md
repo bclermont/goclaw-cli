@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-GoClaw CLI is a production-ready command-line interface for managing GoClaw AI agent gateway servers. Built with Cobra framework and Go, it provides full API coverage for the GoClaw dashboard accessible through both interactive (human) and automation (AI agent/CI) modes.
+GoClaw CLI is a production-ready command-line interface for managing GoClaw AI agent gateway servers. Built with Cobra framework and Go, it provides broad dashboard and super-admin operational coverage through both interactive (human) and automation (AI agent/CI) modes.
 
 **Repository:** https://github.com/nextlevelbuilder/goclaw-cli
 **Status:** Production Ready (Phases 1-9 + P0-P4 Complete)
@@ -23,7 +23,7 @@ Enable developers and AI agents to seamlessly manage GoClaw servers through a un
 | Requirement | Status | Details |
 |-------------|--------|---------|
 | **28 Command Groups** | Complete | Auth, agents, chat, sessions, skills, MCP, providers, tools, cron, teams, channels, traces, memory, knowledge-graph, usage, config, logs, storage, approvals, delegations, credentials, TTS, media, activity |
-| **Full API Coverage** | Complete | Every dashboard feature accessible via CLI |
+| **Operational API Coverage** | Complete | Dashboard and super-admin workflows accessible via CLI |
 | **Dual Mode** | Complete | Interactive (human-friendly TUI) + Automation (flags/env vars) |
 | **Multiple Output Formats** | Complete | Table (human), JSON (machines), YAML (configuration) |
 | **Real-time Streaming** | Complete | WebSocket support for chat, logs, and event streaming |
@@ -163,7 +163,7 @@ goclaw status                               # Server health check
 
 ### Phase 1-9 Complete
 - All 28 command groups implemented
-- Full API coverage verified
+- Operational API coverage verified
 - Dual mode (interactive + automation) working
 - Multi-profile support functional
 - WebSocket streaming operational

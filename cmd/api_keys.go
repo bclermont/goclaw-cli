@@ -113,7 +113,7 @@ var apiKeysRevokeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		_, err = c.Delete("/v1/api-keys/" + url.PathEscape(args[0]))
+		_, err = c.Post("/v1/api-keys/"+url.PathEscape(args[0])+"/revoke", nil)
 		if err != nil {
 			return err
 		}

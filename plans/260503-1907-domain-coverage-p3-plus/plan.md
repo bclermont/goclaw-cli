@@ -25,6 +25,7 @@ Sau R1 (P0–P5) + R2 expansion (P0–P2), CLI đạt ~95% server coverage. R2 r
 
 ## Key Dependencies
 
+- Superseded/blocked by `plans/260518-1936-super-admin-api-parity/` for the next implementation slice. The newer plan narrows the backlog to super-admin operational parity after server `v3.12.0-beta.5`.
 - P3 multi-profile may refactor `internal/config` singleton — finish before P4/P5.
 - P5 begins with **30-min verify sweep** (grep CLI for X1..X12 items) — likely shrinks scope.
 - P6 = upstream goclaw issues, not CLI work.

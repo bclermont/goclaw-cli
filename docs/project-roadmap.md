@@ -1,9 +1,25 @@
 # GoClaw CLI - Project Roadmap
 
-**Last Updated:** 2026-04-15
+**Last Updated:** 2026-05-18
 **Phase Structure:** Legacy Phases 1-9 (bootstrap → CI/CD) + AI-First Expansion Phases 0-5 (2026-04-15)
-**Current Status:** Legacy Phases 1-9 ✓ COMPLETE; P0-P4 ✓ COMPLETE; P5 ⏳ DEFERRED to future sprint
-**Next Phase:** Phase 10 (Unit Testing & QA) or Phase 5 (Advanced Groups: pair, oauth, packages, users, quota, send)
+**Current Status:** Legacy Phases 1-9 ✓ COMPLETE; P0-P4 ✓ COMPLETE; Super Admin API Parity ✓ COMPLETE
+**Next Phase:** Route-drift monitoring and any deferred low-priority endpoint parity.
+
+---
+
+## 2026-05-18: Super Admin API Parity ✓ COMPLETE
+
+**Objective:** Close high-value GoClaw Gateway route gaps for super-admin and coding-agent automation.
+
+**Deliverables:**
+- [x] Fixed `api-keys revoke` to use `POST /v1/api-keys/{id}/revoke`.
+- [x] Added gateway release upgrade controls under `system upgrade` with `gateway` alias.
+- [x] Added package update lifecycle commands with partial-failure detection.
+- [x] Added workstation CRUD, permissions, activity, and WS agent link/unlink.
+- [x] Added webhooks, MCP user credentials, secure CLI env reveal, media upload, TTS HTTP, storage upload/move, contact unmerge, tenant users, and writer groups.
+- [x] Added focused contract tests and full validation.
+
+**Validation:** `go test -count=1 ./...`, `go vet ./...`, `go build ./...`.
 
 ---
 
@@ -592,7 +608,7 @@ https://github.com/nextlevelbuilder/homebrew-goclaw
 
 ### Phase 1-9 (Completed)
 - [x] All 28 command groups implemented and functional
-- [x] Full API coverage verified
+- [x] Operational API coverage verified
 - [x] Dual mode (interactive + automation) operational
 - [x] Multi-profile support working
 - [x] WebSocket streaming functional

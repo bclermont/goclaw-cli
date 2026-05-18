@@ -4,7 +4,7 @@ A production-ready CLI for managing [GoClaw](https://github.com/nextlevelbuilder
 
 ## Features
 
-- **Full API coverage** — Every dashboard feature accessible via CLI
+- **Broad operational API coverage** — Dashboard and super-admin gateway workflows accessible via CLI
 - **Dual mode** — Interactive (humans) + Automation (AI agents / CI)
 - **Security-first** — OS keyring credential storage, TLS by default, no secrets in `ps`
 - **Multiple output formats** — Table, JSON, YAML
@@ -81,6 +81,9 @@ echo "Analyze this log" | goclaw chat myagent
 | `media` | Media upload/download |
 | `activity` | Audit log |
 | `api-keys` | API key management (create, list, revoke) |
+| `system upgrade` | Gateway release upgrade status and trigger controls |
+| `workstations` | Coding-agent workstation CRUD, permissions, activity, and agent links |
+| `webhooks` | Webhook admin CRUD, secret rotation, and deletion |
 | `api-docs` | API documentation (Swagger UI, OpenAPI spec) |
 | `backup` | System/tenant backup, signed download, S3 integration |
 | `restore` | System/tenant restore from backup archive |

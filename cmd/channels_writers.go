@@ -25,6 +25,24 @@ var channelsWritersListCmd = &cobra.Command{
 	},
 }
 
+var channelsWritersGroupsCmd = &cobra.Command{
+	Use:   "groups <instanceID>",
+	Short: "List writer groups",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		data, err := c.Get("/v1/channels/instances/" + args[0] + "/writers/groups")
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalList(data))
+		return nil
+	},
+}
+
 var channelsWritersAddCmd = &cobra.Command{
 	Use: "add <instanceID>", Short: "Add writer", Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -67,5 +85,5 @@ func init() {
 	_ = channelsWritersAddCmd.MarkFlagRequired("user")
 	channelsWritersRemoveCmd.Flags().String("user", "", "User ID")
 	_ = channelsWritersRemoveCmd.MarkFlagRequired("user")
-	channelsWritersCmd.AddCommand(channelsWritersListCmd, channelsWritersAddCmd, channelsWritersRemoveCmd)
+	channelsWritersCmd.AddCommand(channelsWritersListCmd, channelsWritersGroupsCmd, channelsWritersAddCmd, channelsWritersRemoveCmd)
 }

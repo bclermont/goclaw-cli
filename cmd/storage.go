@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 
@@ -53,6 +54,9 @@ var storageGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		if resp.StatusCode >= 400 {
+			return rawResponseError(resp)
+		}
 		defer resp.Body.Close()
 
 		var w io.Writer = os.Stdout
@@ -94,6 +98,49 @@ var storageDeleteCmd = &cobra.Command{
 	},
 }
 
+var storageUploadCmd = &cobra.Command{
+	Use:   "upload <file>",
+	Short: "Upload a file into storage",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		target, _ := cmd.Flags().GetString("path")
+		resp, err := uploadStorageFile(c, args[0], target)
+		if err != nil {
+			return err
+		}
+		result, err := decodeRawResponse(resp)
+		if err != nil {
+			return err
+		}
+		printer.Print(result)
+		return nil
+	},
+}
+
+var storageMoveCmd = &cobra.Command{
+	Use:   "move",
+	Short: "Move or rename a storage file",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		from, _ := cmd.Flags().GetString("from")
+		to, _ := cmd.Flags().GetString("to")
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		q := url.Values{"from": []string{from}, "to": []string{to}}
+		data, err := c.Put("/v1/storage/move?"+q.Encode(), nil)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
+
 var storageSizeCmd = &cobra.Command{
 	Use: "size", Short: "Show storage usage",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -113,7 +160,37 @@ var storageSizeCmd = &cobra.Command{
 func init() {
 	storageListCmd.Flags().String("path", "", "Sub-directory")
 	storageGetCmd.Flags().StringP("output", "f", "", "Output file (default: stdout)")
+	storageUploadCmd.Flags().String("path", "", "Target storage directory")
+	storageMoveCmd.Flags().String("from", "", "Source storage path")
+	storageMoveCmd.Flags().String("to", "", "Destination storage path")
+	_ = storageMoveCmd.MarkFlagRequired("from")
+	_ = storageMoveCmd.MarkFlagRequired("to")
 
-	storageCmd.AddCommand(storageListCmd, storageGetCmd, storageDeleteCmd, storageSizeCmd)
+	storageCmd.AddCommand(storageListCmd, storageGetCmd, storageUploadCmd, storageMoveCmd, storageDeleteCmd, storageSizeCmd)
 	rootCmd.AddCommand(storageCmd)
+}
+
+func uploadStorageFile(c interface {
+	PostRaw(path string, contentType string, body io.Reader) (*http.Response, error)
+}, filePath, targetPath string) (*http.Response, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", filePath, err)
+	}
+	pr, pw := io.Pipe()
+	mw := newMultipartWriter(pw)
+	ct := mw.contentType()
+	go func() {
+		defer f.Close()
+		if err := mw.writeFile("file", filePath, f); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		pw.CloseWithError(mw.close())
+	}()
+	path := "/v1/storage/files"
+	if targetPath != "" {
+		path += "?path=" + url.QueryEscape(targetPath)
+	}
+	return c.PostRaw(path, ct, pr)
 }
