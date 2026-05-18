@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"net/url"
-
 	"github.com/spf13/cobra"
 )
+
+// agentsInstancesCmd and subcommands — extracted from agents.go (Phase 4 split).
+// Owns: list, get-file, set-file, update-metadata for per-user agent instances.
 
 var agentsInstancesCmd = &cobra.Command{
 	Use:   "instances",
@@ -23,7 +24,7 @@ var agentsInstancesListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := c.Get("/v1/agents/" + url.PathEscape(args[0]) + "/instances")
+		data, err := c.Get("/v1/agents/" + args[0] + "/instances")
 		if err != nil {
 			return err
 		}
@@ -43,9 +44,7 @@ var agentsInstancesGetFileCmd = &cobra.Command{
 		}
 		user, _ := cmd.Flags().GetString("user")
 		file, _ := cmd.Flags().GetString("file")
-		// file may contain path separators — don't escape it
-		data, err := c.Get(fmt.Sprintf("/v1/agents/%s/instances/%s/files/%s",
-			url.PathEscape(args[0]), url.PathEscape(user), file))
+		data, err := c.Get(fmt.Sprintf("/v1/agents/%s/instances/%s/files/%s", args[0], user, file))
 		if err != nil {
 			return err
 		}
@@ -61,7 +60,14 @@ var agentsInstancesGetFileCmd = &cobra.Command{
 var agentsInstancesSetFileCmd = &cobra.Command{
 	Use:   "set-file <agentID>",
 	Short: "Set an instance context file",
-	Args:  cobra.ExactArgs(1),
+	Long: `Set the content of a named context file for a specific user instance.
+
+The --content flag accepts a literal string or @filepath to read from disk.
+
+Examples:
+  goclaw agents instances set-file agent-1 --user=user-42 --file=context.md --content="Hello"
+  goclaw agents instances set-file agent-1 --user=user-42 --file=context.md --content=@./context.md`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
@@ -74,9 +80,7 @@ var agentsInstancesSetFileCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		// file may contain path separators — don't escape it
-		_, err = c.Put(fmt.Sprintf("/v1/agents/%s/instances/%s/files/%s",
-			url.PathEscape(args[0]), url.PathEscape(user), file),
+		_, err = c.Put(fmt.Sprintf("/v1/agents/%s/instances/%s/files/%s", args[0], user, file),
 			map[string]any{"content": content})
 		if err != nil {
 			return err
@@ -86,9 +90,40 @@ var agentsInstancesSetFileCmd = &cobra.Command{
 	},
 }
 
+var agentsInstancesUpdateMetadataCmd = &cobra.Command{
+	Use:   "update-metadata <agentID>",
+	Short: "Patch instance metadata for a user",
+	Long: `Patch arbitrary metadata for a specific user instance of an agent.
+
+--metadata must be a valid JSON object string.
+
+Example:
+  goclaw agents instances update-metadata agent-1 --user=user-42 --metadata='{"tier":"premium"}'`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		user, _ := cmd.Flags().GetString("user")
+		metaStr, _ := cmd.Flags().GetString("metadata")
+		var body map[string]any
+		if err := json.Unmarshal([]byte(metaStr), &body); err != nil {
+			return fmt.Errorf("invalid JSON metadata: %w", err)
+		}
+		_, err = c.Patch(fmt.Sprintf("/v1/agents/%s/instances/%s/metadata", args[0], user), body)
+		if err != nil {
+			return err
+		}
+		printer.Success("Metadata updated")
+		return nil
+	},
+}
+
+// agentsInstancesMetadataCmd is kept as legacy alias for get/patch (was in agents.go).
 var agentsInstancesMetadataCmd = &cobra.Command{
 	Use:   "metadata <agentID>",
-	Short: "Get or patch instance metadata",
+	Short: "Get or patch instance metadata (use update-metadata for patching)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
@@ -102,33 +137,50 @@ var agentsInstancesMetadataCmd = &cobra.Command{
 			if err := json.Unmarshal([]byte(patch), &body); err != nil {
 				return fmt.Errorf("invalid JSON patch: %w", err)
 			}
-			_, err = c.Patch(fmt.Sprintf("/v1/agents/%s/instances/%s/metadata",
-				url.PathEscape(args[0]), url.PathEscape(user)), body)
+			_, err = c.Patch(fmt.Sprintf("/v1/agents/%s/instances/%s/metadata", args[0], user), body)
 			if err != nil {
 				return err
 			}
 			printer.Success("Metadata updated")
 			return nil
 		}
-		printer.Success("Use --patch to update metadata")
+		printer.Success("Use --patch to update metadata, or use 'update-metadata' subcommand")
 		return nil
 	},
 }
 
 func init() {
-	for _, cmd := range []*cobra.Command{agentsInstancesGetFileCmd, agentsInstancesSetFileCmd, agentsInstancesMetadataCmd} {
-		cmd.Flags().String("user", "", "User ID")
-		_ = cmd.MarkFlagRequired("user")
-	}
+	// get-file flags
+	agentsInstancesGetFileCmd.Flags().String("user", "", "User ID")
+	_ = agentsInstancesGetFileCmd.MarkFlagRequired("user")
 	agentsInstancesGetFileCmd.Flags().String("file", "", "File name")
 	_ = agentsInstancesGetFileCmd.MarkFlagRequired("file")
+
+	// set-file flags
+	agentsInstancesSetFileCmd.Flags().String("user", "", "User ID")
+	_ = agentsInstancesSetFileCmd.MarkFlagRequired("user")
 	agentsInstancesSetFileCmd.Flags().String("file", "", "File name")
-	agentsInstancesSetFileCmd.Flags().String("content", "", "Content (or @filepath)")
 	_ = agentsInstancesSetFileCmd.MarkFlagRequired("file")
+	agentsInstancesSetFileCmd.Flags().String("content", "", "Content string or @filepath")
 	_ = agentsInstancesSetFileCmd.MarkFlagRequired("content")
+
+	// update-metadata flags
+	agentsInstancesUpdateMetadataCmd.Flags().String("user", "", "User ID")
+	_ = agentsInstancesUpdateMetadataCmd.MarkFlagRequired("user")
+	agentsInstancesUpdateMetadataCmd.Flags().String("metadata", "", "JSON object to merge into metadata")
+	_ = agentsInstancesUpdateMetadataCmd.MarkFlagRequired("metadata")
+
+	// legacy metadata flags
+	agentsInstancesMetadataCmd.Flags().String("user", "", "User ID")
+	_ = agentsInstancesMetadataCmd.MarkFlagRequired("user")
 	agentsInstancesMetadataCmd.Flags().String("patch", "", "JSON patch object")
 
-	agentsInstancesCmd.AddCommand(agentsInstancesListCmd, agentsInstancesGetFileCmd,
-		agentsInstancesSetFileCmd, agentsInstancesMetadataCmd)
+	agentsInstancesCmd.AddCommand(
+		agentsInstancesListCmd,
+		agentsInstancesGetFileCmd,
+		agentsInstancesSetFileCmd,
+		agentsInstancesUpdateMetadataCmd,
+		agentsInstancesMetadataCmd,
+	)
 	agentsCmd.AddCommand(agentsInstancesCmd)
 }

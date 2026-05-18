@@ -3,15 +3,22 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/nextlevelbuilder/goclaw-cli/internal/output"
 	"github.com/nextlevelbuilder/goclaw-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
 
+// teams.go — root command + list/get/create/update/delete (core CRUD only, <200 LoC).
+// Members extracted → teams_members.go
+// Tasks extracted/extended → teams_tasks.go
+// Workspace extracted → teams_workspace.go
+// Events → teams_events.go
+// Scopes → teams_scopes.go
+
 var teamsCmd = &cobra.Command{Use: "teams", Short: "Manage agent teams"}
 
 var teamsListCmd = &cobra.Command{
-	Use: "list", Short: "List teams",
+	Use:   "list",
+	Short: "List teams",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -25,21 +32,15 @@ var teamsListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if cfg.OutputFormat != "table" {
-			printer.Print(unmarshalList(data))
-			return nil
-		}
-		tbl := output.NewTable("ID", "NAME", "MEMBERS", "TASKS")
-		for _, t := range unmarshalList(data) {
-			tbl.AddRow(str(t, "id"), str(t, "name"), str(t, "member_count"), str(t, "task_count"))
-		}
-		printer.Print(tbl)
+		printer.Print(unmarshalList(data))
 		return nil
 	},
 }
 
 var teamsGetCmd = &cobra.Command{
-	Use: "get <id>", Short: "Get team details", Args: cobra.ExactArgs(1),
+	Use:   "get <id>",
+	Short: "Get team details",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -59,7 +60,8 @@ var teamsGetCmd = &cobra.Command{
 }
 
 var teamsCreateCmd = &cobra.Command{
-	Use: "create", Short: "Create a team",
+	Use:   "create",
+	Short: "Create a team",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -82,7 +84,9 @@ var teamsCreateCmd = &cobra.Command{
 }
 
 var teamsUpdateCmd = &cobra.Command{
-	Use: "update <id>", Short: "Update team", Args: cobra.ExactArgs(1),
+	Use:   "update <id>",
+	Short: "Update team",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -107,7 +111,9 @@ var teamsUpdateCmd = &cobra.Command{
 }
 
 var teamsDeleteCmd = &cobra.Command{
-	Use: "delete <id>", Short: "Delete team", Args: cobra.ExactArgs(1),
+	Use:   "delete <id>",
+	Short: "Delete team",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !tui.Confirm("Delete this team?", cfg.Yes) {
 			return nil
@@ -135,7 +141,10 @@ func init() {
 	_ = teamsCreateCmd.MarkFlagRequired("name")
 	teamsUpdateCmd.Flags().String("name", "", "Team name")
 
-	// members, tasks, workspace, and extra cmds are registered from their own init() files
-	teamsCmd.AddCommand(teamsListCmd, teamsGetCmd, teamsCreateCmd, teamsUpdateCmd, teamsDeleteCmd)
+	teamsCmd.AddCommand(
+		teamsListCmd, teamsGetCmd, teamsCreateCmd, teamsUpdateCmd, teamsDeleteCmd,
+		teamsMembersCmd, teamsTasksCmd, teamsWorkspaceCmd,
+		teamsEventsCmd, teamsScopesCmd,
+	)
 	rootCmd.AddCommand(teamsCmd)
 }

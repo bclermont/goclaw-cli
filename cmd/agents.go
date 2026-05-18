@@ -3,12 +3,26 @@ package cmd
 import (
 	"fmt"
 
-	"net/url"
-
 	"github.com/nextlevelbuilder/goclaw-cli/internal/output"
 	"github.com/nextlevelbuilder/goclaw-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
+
+// agents.go — root + list/get/create/update/delete (core CRUD only, <200 LoC).
+// share/unshare/regenerate/resummon → agents_sharing.go
+// Instances → agents_instances.go | Links → agents_links.go
+// Lifecycle → agents_lifecycle.go | Evolution → agents_evolution.go
+// Episodic → agents_episodic.go   | v3-flags → agents_v3_flags.go
+// Orchestration/codex → agents_misc.go
+
+// agents.go — root command + list/get/create/update/delete/share/unshare/regenerate/resummon.
+// Instances extracted → agents_instances.go
+// Links extracted → agents_links.go (unchanged)
+// Lifecycle (wake/wait/identity/sync-workspace/prompt-preview) → agents_lifecycle.go
+// Evolution → agents_evolution.go
+// Episodic → agents_episodic.go
+// v3-flags → agents_v3_flags.go
+// Orchestration/codex-pool-activity → agents_misc.go
 
 var agentsCmd = &cobra.Command{
 	Use:   "agents",
@@ -50,7 +64,7 @@ var agentsGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := c.Get("/v1/agents/" + url.PathEscape(args[0]))
+		data, err := c.Get("/v1/agents/" + args[0])
 		if err != nil {
 			return err
 		}
@@ -74,10 +88,15 @@ var agentsCreateCmd = &cobra.Command{
 		contextWindow, _ := cmd.Flags().GetInt("context-window")
 		workspace, _ := cmd.Flags().GetString("workspace")
 		budget, _ := cmd.Flags().GetInt("budget")
+
 		body := buildBody(
-			"display_name", name, "provider", provider, "model", model,
-			"agent_type", agentType, "context_window", contextWindow,
-			"workspace", workspace, "monthly_cents", budget,
+			"display_name", name,
+			"provider", provider,
+			"model", model,
+			"agent_type", agentType,
+			"context_window", contextWindow,
+			"workspace", workspace,
+			"monthly_cents", budget,
 		)
 		data, err := c.Post("/v1/agents", body)
 		if err != nil {
@@ -123,7 +142,7 @@ var agentsUpdateCmd = &cobra.Command{
 		if len(body) == 0 {
 			return fmt.Errorf("no fields to update — use flags like --name, --model, etc.")
 		}
-		_, err = c.Put("/v1/agents/"+url.PathEscape(args[0]), body)
+		_, err = c.Put("/v1/agents/"+args[0], body)
 		if err != nil {
 			return err
 		}
@@ -144,7 +163,7 @@ var agentsDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		_, err = c.Delete("/v1/agents/" + url.PathEscape(args[0]))
+		_, err = c.Delete("/v1/agents/" + args[0])
 		if err != nil {
 			return err
 		}
@@ -154,6 +173,7 @@ var agentsDeleteCmd = &cobra.Command{
 }
 
 func init() {
+	// Agent CRUD flags
 	for _, cmd := range []*cobra.Command{agentsCreateCmd, agentsUpdateCmd} {
 		cmd.Flags().String("name", "", "Agent display name")
 		cmd.Flags().String("provider", "", "LLM provider name")
@@ -164,7 +184,13 @@ func init() {
 		cmd.Flags().Int("budget", 0, "Monthly budget in cents")
 	}
 
-	// ops (share/unshare/regenerate/resummon/wait), links, instances registered from their files
-	agentsCmd.AddCommand(agentsListCmd, agentsGetCmd, agentsCreateCmd, agentsUpdateCmd, agentsDeleteCmd)
+	// Wire up core CRUD commands.
+	// share/unshare/regenerate/resummon → agents_sharing.go init()
+	// agentsInstancesCmd → agents_instances.go init()
+	// agentsLinksCmd     → agents_links.go init()
+	// lifecycle/evolution/episodic/v3-flags/misc → respective files' init()
+	agentsCmd.AddCommand(
+		agentsListCmd, agentsGetCmd, agentsCreateCmd, agentsUpdateCmd, agentsDeleteCmd,
+	)
 	rootCmd.AddCommand(agentsCmd)
 }

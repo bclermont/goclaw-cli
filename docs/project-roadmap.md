@@ -1,8 +1,25 @@
 # GoClaw CLI - Project Roadmap
 
-**Last Updated:** 2026-03-15
-**Current Status:** Phase 9 Complete (Production Ready)
-**Next Phase:** Phase 10 (Testing & Quality Assurance)
+**Last Updated:** 2026-05-18
+**Phase Structure:** Legacy Phases 1-9 (bootstrap → CI/CD) + AI-First Expansion Phases 0-5 (2026-04-15)
+**Current Status:** Legacy Phases 1-9 ✓ COMPLETE; P0-P4 ✓ COMPLETE; Super Admin API Parity ✓ COMPLETE
+**Next Phase:** Route-drift monitoring and any deferred low-priority endpoint parity.
+
+---
+
+## 2026-05-18: Super Admin API Parity ✓ COMPLETE
+
+**Objective:** Close high-value GoClaw Gateway route gaps for super-admin and coding-agent automation.
+
+**Deliverables:**
+- [x] Fixed `api-keys revoke` to use `POST /v1/api-keys/{id}/revoke`.
+- [x] Added gateway release upgrade controls under `system upgrade` with `gateway` alias.
+- [x] Added package update lifecycle commands with partial-failure detection.
+- [x] Added workstation CRUD, permissions, activity, and WS agent link/unlink.
+- [x] Added webhooks, MCP user credentials, secure CLI env reveal, media upload, TTS HTTP, storage upload/move, contact unmerge, tenant users, and writer groups.
+- [x] Added focused contract tests and full validation.
+
+**Validation:** `go test -count=1 ./...`, `go vet ./...`, `go build ./...`.
 
 ---
 
@@ -265,6 +282,154 @@
 
 ---
 
+## Phase 0: AI Ergonomics Foundation ✓ COMPLETE
+
+**Objective:** Implement exit codes, TTY-aware output, structured error handling, and streaming reconnect for AI/automation consumers
+
+**Duration:** ~3 days
+**Completion Date:** 2026-04-15
+
+**Deliverables:**
+- [x] Exit code mapping (server codes → 0-6)
+- [x] TTY detection + format auto-resolution
+- [x] Structured error output (JSON envelope with code/message/details)
+- [x] FollowStream with exponential backoff reconnect
+- [x] Central error handler in cmd.Execute()
+- [x] --quiet flag for non-TTY contexts
+- [x] Updated CHANGELOG, README, CLAUDE.md
+
+**Status:** COMPLETE with 1 HIGH finding (H1: handler error retry semantics) + 3 MEDIUM findings (M1: MaxRetries=0 override, M3: --output validation)
+
+**Key Files:**
+- `internal/output/exit.go`, `error.go`, `tty.go`
+- `internal/client/follow.go`
+- `cmd/root.go` (error handler)
+- `CHANGELOG.md` (breaking change doc)
+
+**Note:** Phase 0 is foundational AI ergonomics. Recommended fixes for H1/M1/M3 should be addressed before merging Phase 1+ features.
+
+---
+
+## Phases 1-4: AI-First CLI Expansion (2026-04-15)
+
+**Context:** After completing legacy Phases 1-9 (bootstrap through CI/CD), this expansion (P0-P5) adds AI-agent-centric ergonomics and advanced CLI features.
+
+### P1: Admin/Ops Foundation ✓ COMPLETE
+
+**Deliverables:**
+- [x] `tenants` group (CRUD, user membership)
+- [x] `heartbeat` group (agent health, monitoring, logs with WS streaming)
+- [x] `system-configs` group (key-value server configuration)
+- [x] `edition` group (server edition info, no auth)
+- [x] `config` extensions (permissions CRUD via HTTP + WS)
+
+**Key Files:** `cmd/tenants.go`, `cmd/heartbeat.go`, `cmd/system_configs.go`, `cmd/edition.go`, `cmd/config_cmd.go` extensions
+
+**Status:** COMPLETE; 1 critical fix applied (config permissions revoke gated with `tui.Confirm`)
+
+---
+
+### P2: Migration (Backup/Restore + Export/Import) ✓ COMPLETE
+
+**Deliverables:**
+- [x] `backup` group (system/tenant, preflight, signed download, S3 integration)
+- [x] `restore` group (system/tenant with typed confirmation safety)
+- [x] Export/import for agents, teams, skills, mcp (preview-first)
+- [x] Signed download flow (unauthenticated binary via token)
+- [x] Multipart streaming upload (no RAM buffering)
+
+**Key Files:** `cmd/backup.go`, `cmd/backup_s3.go`, `cmd/restore.go`, `cmd/*_export.go`, `internal/client/signed_download.go`, `internal/client/multipart_upload.go`
+
+**Status:** COMPLETE; 4 critical fixes applied (S3 masking, URL escaping, error propagation, MkdirAll)
+
+---
+
+### P3: Vault (Knowledge Vault / RAG) ✓ COMPLETE
+
+**Deliverables:**
+- [x] `vault` group (documents CRUD, links management, upload, search, tree view, graph, enrichment)
+- [x] Document metadata + links (knowledge graph edges)
+- [x] Streaming multipart file upload
+- [x] Semantic + full-text search (RAG)
+- [x] Directory tree browser (TTY: ASCII, piped: JSON)
+- [x] Graph visualization (JSON or Graphviz DOT format)
+- [x] Background enrichment pipeline control
+
+**Key Files:** `cmd/vault.go`, `cmd/vault_documents.go`, `cmd/vault_links.go`, `cmd/vault_upload.go`, `cmd/vault_enrichment.go`, `internal/output/tree.go`
+
+**Status:** COMPLETE; 2 critical fixes applied (documents create --file handling, URL query escaping)
+
+**Deferred:** vault_documents.go split (303 LoC overage; refactoring only, low priority)
+
+---
+
+### P4: Agent Lifecycle + Chat + Teams + Memory KG ✓ COMPLETE
+
+**Deliverables:**
+- [x] `agents` extensions (lifecycle: wake/wait/identity; admin ops; sharing; instances; links; evolution; episodic; v3-flags; misc)
+- [x] `chat` extensions (history, inject, session-status — AI-critical MAX POLISH)
+- [x] `teams` extensions (members, tasks: CRUD + review + advanced + delete-bulk, workspace, events streaming, scopes)
+- [x] `memory kg` subsystem (entities CRUD, traversal, stats, graph, deduplication, legacy compat)
+- [x] `memory` extensions (index, chunks, global documents)
+- [x] AI-critical commands with ≥80% test coverage
+
+**Key Files:** 26 new files (agents_*, chat_ai_commands.go, teams_*, memory_kg_*) + 4 modified (agents.go trimmed to 196 LoC, chat.go to 214 LoC, teams.go to 150 LoC, memory.go to 147 LoC)
+
+**Status:** COMPLETE with modularization; 2 critical fixes applied (strict JSON validation, WS cleanup on timeout)
+
+**Note:** chat.go and chat_ai_commands.go are 214 LoC (14 lines over limit) — overage is entirely docstrings for AI-critical help text (MAX POLISH requirement)
+
+---
+
+### P5: Advanced Groups (pair, oauth, packages, users, quota, send) ✓ COMPLETE
+
+**Deliverables:**
+- [x] `pair` — Device pairing CLI flow
+- [x] `oauth` — OAuth authorization endpoints (ChatGPT/OpenAI providers)
+- [x] `packages` — Package management (list, install, runtimes, deny-groups, github-releases)
+- [x] `users` — User account search
+- [x] `quota` — Usage quota/limits
+- [x] `send` — Message broadcasting
+
+**Subcommand extensions:**
+- [x] channels pending extensions
+- [x] skills install-dep
+- [x] providers verify-embedding / claude-cli
+- [x] tools builtin tenant-config
+- [x] admin credentials extensions
+
+**Status:** COMPLETE (commit `6697b1f`)
+
+---
+
+### P6: Domain Coverage Expansion ✓ COMPLETE (2026-05-02)
+
+**Objective:** Reach CLI parity with server admin surface (~261 REST routes + 100+ WS RPC).
+
+**P0 — Critical:**
+- [x] `hooks` (list/create/update/delete/toggle/test/history) — entire hooks domain (`cmd/hooks.go`, `cmd/hooks_test_runner.go`)
+- [x] `agents files` (list/get/set) — global context files: AGENTS.md, SOUL.md, IDENTITY.md, USER.md, USER_PREDEFINED.md, CAPABILITIES.md, BOOTSTRAP.md, MEMORY.json, HEARTBEAT (`cmd/agents_files.go`)
+
+**P1 — Lifecycle & analytics:**
+- [x] `agents cancel-summon`, `agents skills list` (in `cmd/agents_misc.go`)
+- [x] `usage timeseries`, `usage breakdown` (in `cmd/traces.go`)
+
+**P2 — Coverage completion:**
+- [x] `tts test-connection`, `voices list/refresh` (in `cmd/admin_tts_media.go`)
+- [x] `memory kg extract` re-pointed to new endpoint (`cmd/memory_kg_legacy.go`)
+- [x] `files sign` (`cmd/files.go`)
+- [x] `teams workspace upload/move` (in `cmd/teams_workspace.go`)
+- [x] `packages github-releases` (in `cmd/packages.go`)
+
+**Status:** COMPLETE — `go build`, `go vet`, `go test ./cmd/...` all pass.
+
+**Deferred / out of scope:**
+- OpenAI-compatible `/chat/completions` and `/v1/responses` (client APIs)
+- `evolution_skill_apply` (no REST route registered server-side)
+- `hooks history` pagination (server stub returns empty list pending Phase 4)
+
+---
+
 ## Phase 10: Testing & Quality Assurance (PLANNED)
 
 **Objective:** Achieve high code coverage with table-driven tests and integration tests
@@ -443,7 +608,7 @@ https://github.com/nextlevelbuilder/homebrew-goclaw
 
 ### Phase 1-9 (Completed)
 - [x] All 28 command groups implemented and functional
-- [x] Full API coverage verified
+- [x] Operational API coverage verified
 - [x] Dual mode (interactive + automation) operational
 - [x] Multi-profile support working
 - [x] WebSocket streaming functional

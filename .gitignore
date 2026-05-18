@@ -15,9 +15,7 @@ dist/
 vendor/
 *.test
 coverage.out
-
-# Planning artifacts
-plans/
+*.coverprofile
 
 # IDE
 .idea/
@@ -28,3 +26,8 @@ plans/
 # OS
 .DS_Store
 Thumbs.db
+
+# Tooling artifacts (local-only)
+.claude/
+repomix-output.xml
+docs/journals/

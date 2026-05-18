@@ -1,17 +1,28 @@
 package cmd
 
 import (
-	"net/url"
+	"encoding/json"
+	"fmt"
 
 	"github.com/nextlevelbuilder/goclaw-cli/internal/output"
 	"github.com/nextlevelbuilder/goclaw-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
 
-var credentialsCmd = &cobra.Command{Use: "credentials", Short: "Manage CLI credentials store"}
+// admin_credentials.go owns the credentials subcommand tree under adminCmd.
+// Extracted from admin.go to keep file sizes under 200 LoC.
+// Covers: list, create, delete (existing) + update, test, presets, check-binary (new).
+// User-credentials subtree → admin_credentials_users.go
+// Agent-grants subtree    → admin_credentials_grants.go
 
-var credentialsListCmd = &cobra.Command{
-	Use: "list", Short: "List stored credentials",
+var adminCredentialsCmd = &cobra.Command{
+	Use:   "credentials",
+	Short: "Manage CLI credentials store",
+}
+
+var adminCredentialsListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List stored credentials",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
@@ -34,24 +45,9 @@ var credentialsListCmd = &cobra.Command{
 	},
 }
 
-var credentialsGetCmd = &cobra.Command{
-	Use: "get <id>", Short: "Get credential details", Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newHTTP()
-		if err != nil {
-			return err
-		}
-		data, err := c.Get("/v1/cli-credentials/" + url.PathEscape(args[0]))
-		if err != nil {
-			return err
-		}
-		printer.Print(unmarshalMap(data))
-		return nil
-	},
-}
-
-var credentialsCreateCmd = &cobra.Command{
-	Use: "create", Short: "Create CLI credential",
+var adminCredentialsCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a CLI credential",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
@@ -67,19 +63,24 @@ var credentialsCreateCmd = &cobra.Command{
 	},
 }
 
-var credentialsUpdateCmd = &cobra.Command{
-	Use: "update <id>", Short: "Update CLI credential", Args: cobra.ExactArgs(1),
+var adminCredentialsUpdateCmd = &cobra.Command{
+	Use:   "update <id>",
+	Short: "Update a CLI credential",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		bodyJSON, _ := cmd.Flags().GetString("body")
+		if bodyJSON == "" {
+			return fmt.Errorf("--body is required (JSON object)")
+		}
+		var body map[string]any
+		if err := json.Unmarshal([]byte(bodyJSON), &body); err != nil {
+			return fmt.Errorf("invalid --body JSON: %w", err)
+		}
 		c, err := newHTTP()
 		if err != nil {
 			return err
 		}
-		body := make(map[string]any)
-		if cmd.Flags().Changed("name") {
-			v, _ := cmd.Flags().GetString("name")
-			body["name"] = v
-		}
-		_, err = c.Put("/v1/cli-credentials/"+url.PathEscape(args[0]), body)
+		_, err = c.Put("/v1/cli-credentials/"+args[0], body)
 		if err != nil {
 			return err
 		}
@@ -88,8 +89,10 @@ var credentialsUpdateCmd = &cobra.Command{
 	},
 }
 
-var credentialsDeleteCmd = &cobra.Command{
-	Use: "delete <id>", Short: "Delete CLI credential", Args: cobra.ExactArgs(1),
+var adminCredentialsDeleteCmd = &cobra.Command{
+	Use:   "delete <id>",
+	Short: "Delete a CLI credential (requires --yes)",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !tui.Confirm("Delete this credential?", cfg.Yes) {
 			return nil
@@ -98,7 +101,7 @@ var credentialsDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		_, err = c.Delete("/v1/cli-credentials/" + url.PathEscape(args[0]))
+		_, err = c.Delete("/v1/cli-credentials/" + args[0])
 		if err != nil {
 			return err
 		}
@@ -107,14 +110,16 @@ var credentialsDeleteCmd = &cobra.Command{
 	},
 }
 
-var credentialsTestCmd = &cobra.Command{
-	Use: "test <id>", Short: "Test CLI credential", Args: cobra.ExactArgs(1),
+var adminCredentialsTestCmd = &cobra.Command{
+	Use:   "test <id>",
+	Short: "Dry-run test a CLI credential (executes binary, no side-effects)",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
 			return err
 		}
-		data, err := c.Post("/v1/cli-credentials/"+url.PathEscape(args[0])+"/test", nil)
+		data, err := c.Post("/v1/cli-credentials/"+args[0]+"/test", nil)
 		if err != nil {
 			return err
 		}
@@ -123,8 +128,9 @@ var credentialsTestCmd = &cobra.Command{
 	},
 }
 
-var credentialsPresetsCmd = &cobra.Command{
-	Use: "presets", Short: "List credential presets",
+var adminCredentialsPresetsCmd = &cobra.Command{
+	Use:   "presets",
+	Short: "List available credential presets",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
@@ -139,12 +145,44 @@ var credentialsPresetsCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	credentialsCreateCmd.Flags().String("name", "", "Credential name")
-	_ = credentialsCreateCmd.MarkFlagRequired("name")
-	credentialsUpdateCmd.Flags().String("name", "", "New credential name")
+var adminCredentialsCheckBinaryCmd = &cobra.Command{
+	Use:   "check-binary",
+	Short: "Verify a CLI binary is accessible on the server",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		bodyJSON, _ := cmd.Flags().GetString("body")
+		var body map[string]any
+		if bodyJSON != "" {
+			if err := json.Unmarshal([]byte(bodyJSON), &body); err != nil {
+				return fmt.Errorf("invalid --body JSON: %w", err)
+			}
+		}
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		data, err := c.Post("/v1/cli-credentials/check-binary", body)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
 
-	credentialsCmd.AddCommand(credentialsListCmd, credentialsGetCmd, credentialsCreateCmd,
-		credentialsUpdateCmd, credentialsDeleteCmd, credentialsTestCmd, credentialsPresetsCmd)
-	rootCmd.AddCommand(credentialsCmd)
+func init() {
+	adminCredentialsCreateCmd.Flags().String("name", "", "Credential name (required)")
+	_ = adminCredentialsCreateCmd.MarkFlagRequired("name")
+
+	adminCredentialsUpdateCmd.Flags().String("body", "", "Update payload as JSON object (required)")
+	adminCredentialsCheckBinaryCmd.Flags().String("body", "", "Check payload as JSON object")
+
+	adminCredentialsCmd.AddCommand(
+		adminCredentialsListCmd,
+		adminCredentialsCreateCmd,
+		adminCredentialsUpdateCmd,
+		adminCredentialsDeleteCmd,
+		adminCredentialsTestCmd,
+		adminCredentialsPresetsCmd,
+		adminCredentialsCheckBinaryCmd,
+	)
 }

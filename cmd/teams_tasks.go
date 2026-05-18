@@ -7,10 +7,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// teams_tasks.go — core task CRUD: list/get/get-light/create/assign/approve/reject/comment/comments.
+// Advanced ops (delete/delete-bulk/events/active) → teams_tasks_advanced.go
+
 var teamsTasksCmd = &cobra.Command{Use: "tasks", Short: "Manage team tasks"}
 
 var teamsTasksListCmd = &cobra.Command{
-	Use: "list <teamID>", Short: "List team tasks", Args: cobra.ExactArgs(1),
+	Use:   "list <teamID>",
+	Short: "List team tasks",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -42,7 +47,9 @@ var teamsTasksListCmd = &cobra.Command{
 }
 
 var teamsTasksGetCmd = &cobra.Command{
-	Use: "get <teamID> <taskID>", Short: "Get task details", Args: cobra.ExactArgs(2),
+	Use:   "get <teamID> <taskID>",
+	Short: "Get task details",
+	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -63,8 +70,34 @@ var teamsTasksGetCmd = &cobra.Command{
 	},
 }
 
+var teamsTasksGetLightCmd = &cobra.Command{
+	Use:   "get-light <teamID> <taskID>",
+	Short: "Get lightweight task summary",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ws, err := newWS("cli")
+		if err != nil {
+			return err
+		}
+		if _, err := ws.Connect(); err != nil {
+			return err
+		}
+		defer ws.Close()
+		data, err := ws.Call("teams.tasks.get-light", map[string]any{
+			"team_id": args[0], "task_id": args[1],
+		})
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
+
 var teamsTasksCreateCmd = &cobra.Command{
-	Use: "create <teamID>", Short: "Create task", Args: cobra.ExactArgs(1),
+	Use:   "create <teamID>",
+	Short: "Create a task",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -88,7 +121,9 @@ var teamsTasksCreateCmd = &cobra.Command{
 }
 
 var teamsTasksAssignCmd = &cobra.Command{
-	Use: "assign <teamID> <taskID>", Short: "Assign task", Args: cobra.ExactArgs(2),
+	Use:   "assign <teamID> <taskID>",
+	Short: "Assign a task to an agent",
+	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -110,16 +145,23 @@ var teamsTasksAssignCmd = &cobra.Command{
 	},
 }
 
+// approve/reject/comment/comments registered in teams_tasks_review.go init()
+
 func init() {
 	teamsTasksListCmd.Flags().String("status", "", "Filter: open, assigned, approved, rejected")
+
 	teamsTasksCreateCmd.Flags().String("title", "", "Task title")
 	teamsTasksCreateCmd.Flags().String("description", "", "Task description")
 	teamsTasksCreateCmd.Flags().String("assignee", "", "Assignee agent ID")
 	_ = teamsTasksCreateCmd.MarkFlagRequired("title")
+
 	teamsTasksAssignCmd.Flags().String("agent", "", "Agent ID")
 	_ = teamsTasksAssignCmd.MarkFlagRequired("agent")
 
-	// approve/reject/comment/comments/events registered from teams_tasks_actions.go
-	teamsTasksCmd.AddCommand(teamsTasksListCmd, teamsTasksGetCmd, teamsTasksCreateCmd, teamsTasksAssignCmd)
-	teamsCmd.AddCommand(teamsTasksCmd)
+	// delete/delete-bulk/events/active → teams_tasks_advanced.go
+	// approve/reject/comment/comments → teams_tasks_review.go
+	teamsTasksCmd.AddCommand(
+		teamsTasksListCmd, teamsTasksGetCmd, teamsTasksGetLightCmd,
+		teamsTasksCreateCmd, teamsTasksAssignCmd,
+	)
 }

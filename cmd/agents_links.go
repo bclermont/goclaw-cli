@@ -3,12 +3,13 @@ package cmd
 import (
 	"fmt"
 
-	"net/url"
-
 	"github.com/nextlevelbuilder/goclaw-cli/internal/output"
 	"github.com/nextlevelbuilder/goclaw-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
+
+// agents_links.go — delegation link management (extracted from original agents.go).
+// HTTP endpoints: /v1/agents/links
 
 var agentsLinksCmd = &cobra.Command{
 	Use:   "links",
@@ -82,7 +83,7 @@ var agentsLinksUpdateCmd = &cobra.Command{
 			v, _ := cmd.Flags().GetInt("max-concurrent")
 			body["max_concurrent"] = v
 		}
-		_, err = c.Put("/v1/agents/links/"+url.PathEscape(args[0]), body)
+		_, err = c.Put("/v1/agents/links/"+args[0], body)
 		if err != nil {
 			return err
 		}
@@ -103,7 +104,7 @@ var agentsLinksDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		_, err = c.Delete("/v1/agents/links/" + url.PathEscape(args[0]))
+		_, err = c.Delete("/v1/agents/links/" + args[0])
 		if err != nil {
 			return err
 		}
@@ -117,6 +118,7 @@ func init() {
 	agentsLinksCreateCmd.Flags().String("target", "", "Target agent ID")
 	agentsLinksCreateCmd.Flags().String("direction", "outbound", "Direction: outbound, inbound, bidirectional")
 	agentsLinksCreateCmd.Flags().Int("max-concurrent", 3, "Max concurrent delegations")
+
 	agentsLinksUpdateCmd.Flags().String("direction", "", "Direction")
 	agentsLinksUpdateCmd.Flags().Int("max-concurrent", 0, "Max concurrent")
 

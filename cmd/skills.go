@@ -14,10 +14,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var skillsCmd = &cobra.Command{Use: "skills", Short: "Manage skills"}
+var skillsCmd = &cobra.Command{
+	Use:   "skills",
+	Short: "Manage skills",
+}
 
 var skillsListCmd = &cobra.Command{
-	Use: "list", Short: "List all skills",
+	Use:   "list",
+	Short: "List all skills",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
@@ -50,13 +54,15 @@ var skillsListCmd = &cobra.Command{
 }
 
 var skillsGetCmd = &cobra.Command{
-	Use: "get <id>", Short: "Get skill details", Args: cobra.ExactArgs(1),
+	Use:   "get <id>",
+	Short: "Get skill details",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
 			return err
 		}
-		data, err := c.Get("/v1/skills/" + url.PathEscape(args[0]))
+		data, err := c.Get("/v1/skills/" + args[0])
 		if err != nil {
 			return err
 		}
@@ -66,26 +72,36 @@ var skillsGetCmd = &cobra.Command{
 }
 
 var skillsUploadCmd = &cobra.Command{
-	Use: "upload <path>", Short: "Upload a skill from a directory or file", Args: cobra.ExactArgs(1),
+	Use:   "upload <path>",
+	Short: "Upload a skill from a directory or file",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
 			return err
 		}
+		skillPath := args[0]
+
+		// Create multipart upload
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
-		file, err := os.Open(args[0])
+
+		// Add file
+		file, err := os.Open(skillPath)
 		if err != nil {
 			return fmt.Errorf("open skill: %w", err)
 		}
 		defer file.Close()
-		part, err := writer.CreateFormFile("file", filepath.Base(args[0]))
+
+		part, err := writer.CreateFormFile("file", filepath.Base(skillPath))
 		if err != nil {
 			return err
 		}
 		if _, err := io.Copy(part, file); err != nil {
 			return err
 		}
+
+		// Add optional fields
 		if v, _ := cmd.Flags().GetString("name"); v != "" {
 			_ = writer.WriteField("name", v)
 		}
@@ -93,6 +109,7 @@ var skillsUploadCmd = &cobra.Command{
 			_ = writer.WriteField("visibility", v)
 		}
 		writer.Close()
+
 		resp, err := c.PostRaw("/v1/skills/upload", writer.FormDataContentType(), &buf)
 		if err != nil {
 			return err
@@ -108,7 +125,9 @@ var skillsUploadCmd = &cobra.Command{
 }
 
 var skillsUpdateCmd = &cobra.Command{
-	Use: "update <id>", Short: "Update a skill", Args: cobra.ExactArgs(1),
+	Use:   "update <id>",
+	Short: "Update a skill",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
@@ -123,7 +142,7 @@ var skillsUpdateCmd = &cobra.Command{
 			v, _ := cmd.Flags().GetString("visibility")
 			body["visibility"] = v
 		}
-		_, err = c.Put("/v1/skills/"+url.PathEscape(args[0]), body)
+		_, err = c.Put("/v1/skills/"+args[0], body)
 		if err != nil {
 			return err
 		}
@@ -133,7 +152,9 @@ var skillsUpdateCmd = &cobra.Command{
 }
 
 var skillsDeleteCmd = &cobra.Command{
-	Use: "delete <id>", Short: "Delete a skill", Args: cobra.ExactArgs(1),
+	Use:   "delete <id>",
+	Short: "Delete a skill",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !tui.Confirm("Delete this skill?", cfg.Yes) {
 			return nil
@@ -142,7 +163,7 @@ var skillsDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		_, err = c.Delete("/v1/skills/" + url.PathEscape(args[0]))
+		_, err = c.Delete("/v1/skills/" + args[0])
 		if err != nil {
 			return err
 		}
@@ -152,13 +173,15 @@ var skillsDeleteCmd = &cobra.Command{
 }
 
 var skillsToggleCmd = &cobra.Command{
-	Use: "toggle <id>", Short: "Enable or disable a skill", Args: cobra.ExactArgs(1),
+	Use:   "toggle <id>",
+	Short: "Enable or disable a skill",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := newHTTP()
 		if err != nil {
 			return err
 		}
-		_, err = c.Post("/v1/skills/"+url.PathEscape(args[0])+"/toggle", nil)
+		_, err = c.Post("/v1/skills/"+args[0]+"/toggle", nil)
 		if err != nil {
 			return err
 		}
@@ -173,9 +196,10 @@ func init() {
 	skillsUploadCmd.Flags().String("visibility", "private", "Visibility: private, shared")
 	skillsUpdateCmd.Flags().String("name", "", "Skill name")
 	skillsUpdateCmd.Flags().String("visibility", "", "Visibility")
-
-	// grants, versions, files, deps, config registered from their own files
+	// skillsGrantCmd, skillsRevokeCmd, skillsVersionsCmd, skillsRuntimesCmd,
+	// skillsFilesCmd, skillsRescanDepsCmd, skillsInstallDepsCmd are in skills_misc.go.
 	skillsCmd.AddCommand(skillsListCmd, skillsGetCmd, skillsUploadCmd, skillsUpdateCmd,
-		skillsDeleteCmd, skillsToggleCmd)
+		skillsDeleteCmd, skillsToggleCmd, skillsGrantCmd, skillsRevokeCmd,
+		skillsVersionsCmd, skillsRuntimesCmd, skillsFilesCmd, skillsRescanDepsCmd, skillsInstallDepsCmd)
 	rootCmd.AddCommand(skillsCmd)
 }

@@ -119,11 +119,37 @@ var delegationsGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := c.Get("/v1/delegations/" + url.PathEscape(args[0]))
+		data, err := c.Get("/v1/delegations/" + args[0])
 		if err != nil {
 			return err
 		}
 		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
+
+// --- Activity ---
+
+var activityCmd = &cobra.Command{
+	Use: "activity", Short: "View audit log",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		q := url.Values{}
+		if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
+			q.Set("limit", fmt.Sprintf("%d", v))
+		}
+		path := "/v1/activity"
+		if len(q) > 0 {
+			path += "?" + q.Encode()
+		}
+		data, err := c.Get(path)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalList(data))
 		return nil
 	},
 }
@@ -138,5 +164,10 @@ func init() {
 	delegationsListCmd.Flags().Int("limit", 20, "Max results")
 	delegationsCmd.AddCommand(delegationsListCmd, delegationsGetCmd)
 
-	rootCmd.AddCommand(approvalsCmd, delegationsCmd)
+	// Activity
+	activityCmd.Flags().Int("limit", 50, "Max results")
+
+	// ttsCmd and mediaCmd are assembled in admin_tts_media.go init().
+	// adminCredentialsCmd is assembled in admin_credentials.go init().
+	rootCmd.AddCommand(approvalsCmd, delegationsCmd, adminCredentialsCmd, activityCmd, ttsCmd, mediaCmd, voicesCmd)
 }

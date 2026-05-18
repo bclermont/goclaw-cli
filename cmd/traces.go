@@ -58,7 +58,7 @@ var tracesGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data, err := c.Get("/v1/traces/" + url.PathEscape(args[0]))
+		data, err := c.Get("/v1/traces/" + args[0])
 		if err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ var tracesExportCmd = &cobra.Command{
 		if outFile == "" {
 			outFile = args[0] + ".json.gz"
 		}
-		resp, err := c.GetRaw("/v1/traces/" + url.PathEscape(args[0]) + "/export")
+		resp, err := c.GetRaw("/v1/traces/" + args[0] + "/export")
 		if err != nil {
 			return err
 		}
@@ -97,12 +97,163 @@ var tracesExportCmd = &cobra.Command{
 	},
 }
 
+// --- Usage/Costs ---
+
+var usageCmd = &cobra.Command{Use: "usage", Short: "View usage and cost analytics"}
+
+var usageSummaryCmd = &cobra.Command{
+	Use: "summary", Short: "Usage summary",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		q := url.Values{}
+		if v, _ := cmd.Flags().GetString("from"); v != "" {
+			q.Set("from", v)
+		}
+		if v, _ := cmd.Flags().GetString("to"); v != "" {
+			q.Set("to", v)
+		}
+		path := "/v1/usage/summary"
+		if len(q) > 0 {
+			path += "?" + q.Encode()
+		}
+		data, err := c.Get(path)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
+
+var usageDetailCmd = &cobra.Command{
+	Use: "detail", Short: "Detailed usage breakdown",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		q := url.Values{}
+		if v, _ := cmd.Flags().GetString("agent"); v != "" {
+			q.Set("agent_id", v)
+		}
+		if v, _ := cmd.Flags().GetString("provider"); v != "" {
+			q.Set("provider", v)
+		}
+		if v, _ := cmd.Flags().GetString("from"); v != "" {
+			q.Set("from", v)
+		}
+		if v, _ := cmd.Flags().GetString("to"); v != "" {
+			q.Set("to", v)
+		}
+		path := "/v1/usage"
+		if len(q) > 0 {
+			path += "?" + q.Encode()
+		}
+		data, err := c.Get(path)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalList(data))
+		return nil
+	},
+}
+
+var usageCostsCmd = &cobra.Command{
+	Use: "costs", Short: "Cost summary",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		data, err := c.Get("/v1/costs/summary")
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
+
+var usageTimeseriesCmd = &cobra.Command{
+	Use: "timeseries", Short: "Token usage over time (GET /v1/usage/timeseries)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		q := url.Values{}
+		for _, k := range []string{"start", "end", "granularity", "agent", "user", "tenant"} {
+			if v, _ := cmd.Flags().GetString(k); v != "" {
+				q.Set(k, v)
+			}
+		}
+		path := "/v1/usage/timeseries"
+		if len(q) > 0 {
+			path += "?" + q.Encode()
+		}
+		data, err := c.Get(path)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
+
+var usageBreakdownCmd = &cobra.Command{
+	Use: "breakdown", Short: "Usage broken down by dimension (GET /v1/usage/breakdown)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		q := url.Values{}
+		for _, k := range []string{"by", "start", "end"} {
+			if v, _ := cmd.Flags().GetString(k); v != "" {
+				q.Set(k, v)
+			}
+		}
+		path := "/v1/usage/breakdown"
+		if len(q) > 0 {
+			path += "?" + q.Encode()
+		}
+		data, err := c.Get(path)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
+		return nil
+	},
+}
+
 func init() {
 	tracesListCmd.Flags().String("agent", "", "Filter by agent ID")
 	tracesListCmd.Flags().String("status", "", "Filter: running, success, error")
 	tracesListCmd.Flags().Int("limit", 20, "Max results")
 	tracesExportCmd.Flags().StringP("output", "f", "", "Output file (default: <traceID>.json.gz)")
 
+	usageSummaryCmd.Flags().String("from", "", "Start date (YYYY-MM-DD)")
+	usageSummaryCmd.Flags().String("to", "", "End date")
+	usageDetailCmd.Flags().String("agent", "", "Agent ID")
+	usageDetailCmd.Flags().String("provider", "", "Provider name")
+	usageDetailCmd.Flags().String("from", "", "Start date")
+	usageDetailCmd.Flags().String("to", "", "End date")
+
+	usageTimeseriesCmd.Flags().String("start", "", "Start ISO timestamp")
+	usageTimeseriesCmd.Flags().String("end", "", "End ISO timestamp")
+	usageTimeseriesCmd.Flags().String("granularity", "day", "Bucket size: hour|day")
+	usageTimeseriesCmd.Flags().String("agent", "", "Filter by agent")
+	usageTimeseriesCmd.Flags().String("user", "", "Filter by user")
+	usageTimeseriesCmd.Flags().String("tenant", "", "Filter by tenant")
+	usageBreakdownCmd.Flags().String("by", "agent", "Dimension: agent|user|tenant")
+	usageBreakdownCmd.Flags().String("start", "", "Start ISO timestamp")
+	usageBreakdownCmd.Flags().String("end", "", "End ISO timestamp")
+
 	tracesCmd.AddCommand(tracesListCmd, tracesGetCmd, tracesExportCmd)
-	rootCmd.AddCommand(tracesCmd)
+	usageCmd.AddCommand(usageSummaryCmd, usageDetailCmd, usageCostsCmd,
+		usageTimeseriesCmd, usageBreakdownCmd)
+	rootCmd.AddCommand(tracesCmd, usageCmd)
 }

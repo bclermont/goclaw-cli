@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 
@@ -20,10 +21,11 @@ var storageListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		path := "/v1/storage/files/"
+		path := "/v1/storage/files"
 		if v, _ := cmd.Flags().GetString("path"); v != "" {
-			// Don't escape path separators — server expects raw path segments
-			path += v
+			q := url.Values{}
+			q.Set("path", v)
+			path += "?" + q.Encode()
 		}
 		data, err := c.Get(path)
 		if err != nil {
@@ -50,10 +52,12 @@ var storageGetCmd = &cobra.Command{
 			return err
 		}
 		outFile, _ := cmd.Flags().GetString("output")
-		// Don't escape path separators — server expects raw path segments
-		resp, err := c.GetRaw("/v1/storage/files/" + args[0])
+		resp, err := c.GetRaw("/v1/storage/files/" + url.PathEscape(args[0]))
 		if err != nil {
 			return err
+		}
+		if resp.StatusCode >= 400 {
+			return rawResponseError(resp)
 		}
 		defer resp.Body.Close()
 
@@ -87,12 +91,54 @@ var storageDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		// Don't escape path separators — server expects raw path segments
-		_, err = c.Delete("/v1/storage/files/" + args[0])
+		_, err = c.Delete("/v1/storage/files/" + url.PathEscape(args[0]))
 		if err != nil {
 			return err
 		}
 		printer.Success("File deleted")
+		return nil
+	},
+}
+
+var storageUploadCmd = &cobra.Command{
+	Use:   "upload <file>",
+	Short: "Upload a file into storage",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		target, _ := cmd.Flags().GetString("path")
+		resp, err := uploadStorageFile(c, args[0], target)
+		if err != nil {
+			return err
+		}
+		result, err := decodeRawResponse(resp)
+		if err != nil {
+			return err
+		}
+		printer.Print(result)
+		return nil
+	},
+}
+
+var storageMoveCmd = &cobra.Command{
+	Use:   "move",
+	Short: "Move or rename a storage file",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		from, _ := cmd.Flags().GetString("from")
+		to, _ := cmd.Flags().GetString("to")
+		c, err := newHTTP()
+		if err != nil {
+			return err
+		}
+		q := url.Values{"from": []string{from}, "to": []string{to}}
+		data, err := c.Put("/v1/storage/move?"+q.Encode(), nil)
+		if err != nil {
+			return err
+		}
+		printer.Print(unmarshalMap(data))
 		return nil
 	},
 }
@@ -113,71 +159,40 @@ var storageSizeCmd = &cobra.Command{
 	},
 }
 
-var storageDownloadCmd = &cobra.Command{
-	Use: "download <path>", Short: "Download a file (forced download)", Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newHTTP()
-		if err != nil {
-			return err
-		}
-		outFile, _ := cmd.Flags().GetString("output")
-		// Don't escape path separators — server expects raw path segments
-		q := url.Values{}
-		q.Set("download", "true")
-		resp, err := c.GetRaw("/v1/storage/files/" + args[0] + "?" + q.Encode())
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		var w io.Writer = os.Stdout
-		if outFile != "" {
-			f, err := os.Create(outFile)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			w = f
-		}
-		n, err := io.Copy(w, resp.Body)
-		if err != nil {
-			return err
-		}
-		if outFile != "" {
-			printer.Success(fmt.Sprintf("Downloaded %d bytes to %s", n, outFile))
-		}
-		return nil
-	},
-}
-
-var storageMoveCmd = &cobra.Command{
-	Use: "move", Short: "Move a file to a new path",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := newHTTP()
-		if err != nil {
-			return err
-		}
-		from, _ := cmd.Flags().GetString("from")
-		to, _ := cmd.Flags().GetString("to")
-		_, err = c.Put("/v1/storage/move", map[string]any{"from": from, "to": to})
-		if err != nil {
-			return err
-		}
-		printer.Success("File moved")
-		return nil
-	},
-}
-
 func init() {
 	storageListCmd.Flags().String("path", "", "Sub-directory")
 	storageGetCmd.Flags().StringP("output", "f", "", "Output file (default: stdout)")
-	storageDownloadCmd.Flags().StringP("output", "f", "", "Output file (default: stdout)")
-	storageMoveCmd.Flags().String("from", "", "Source path")
-	storageMoveCmd.Flags().String("to", "", "Destination path")
+	storageUploadCmd.Flags().String("path", "", "Target storage directory")
+	storageMoveCmd.Flags().String("from", "", "Source storage path")
+	storageMoveCmd.Flags().String("to", "", "Destination storage path")
 	_ = storageMoveCmd.MarkFlagRequired("from")
 	_ = storageMoveCmd.MarkFlagRequired("to")
 
-	storageCmd.AddCommand(storageListCmd, storageGetCmd, storageDeleteCmd, storageSizeCmd,
-		storageDownloadCmd, storageMoveCmd)
+	storageCmd.AddCommand(storageListCmd, storageGetCmd, storageUploadCmd, storageMoveCmd, storageDeleteCmd, storageSizeCmd)
 	rootCmd.AddCommand(storageCmd)
+}
+
+func uploadStorageFile(c interface {
+	PostRaw(path string, contentType string, body io.Reader) (*http.Response, error)
+}, filePath, targetPath string) (*http.Response, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", filePath, err)
+	}
+	pr, pw := io.Pipe()
+	mw := newMultipartWriter(pw)
+	ct := mw.contentType()
+	go func() {
+		defer f.Close()
+		if err := mw.writeFile("file", filePath, f); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		pw.CloseWithError(mw.close())
+	}()
+	path := "/v1/storage/files"
+	if targetPath != "" {
+		path += "?path=" + url.QueryEscape(targetPath)
+	}
+	return c.PostRaw(path, ct, pr)
 }

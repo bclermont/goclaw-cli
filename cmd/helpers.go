@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 
@@ -94,4 +96,77 @@ func buildBody(pairs ...any) map[string]any {
 		}
 	}
 	return body
+}
+
+func decodeRawResponse(resp *http.Response) (map[string]any, error) {
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, apiErrorFromRawBody(resp.StatusCode, data)
+	}
+	if len(data) == 0 {
+		return map[string]any{}, nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return out, nil
+}
+
+func rawResponseError(resp *http.Response) error {
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+	return apiErrorFromRawBody(resp.StatusCode, data)
+}
+
+func apiErrorFromRawBody(status int, data []byte) error {
+	message := strings.TrimSpace(string(data))
+	var env struct {
+		Error any `json:"error"`
+	}
+	if err := json.Unmarshal(data, &env); err == nil {
+		switch e := env.Error.(type) {
+		case string:
+			message = e
+		case map[string]any:
+			code := fmt.Sprintf("%v", e["code"])
+			msg := fmt.Sprintf("%v", e["message"])
+			if code != "" && code != "<nil>" && msg != "" && msg != "<nil>" {
+				return &client.APIError{StatusCode: status, Code: code, Message: msg, Details: e["details"]}
+			}
+		}
+	}
+	if message == "" {
+		message = fmt.Sprintf("HTTP %d", status)
+	}
+	return &client.APIError{StatusCode: status, Code: apiErrorCodeForStatus(status), Message: message}
+}
+
+func apiErrorCodeForStatus(status int) string {
+	switch status {
+	case http.StatusBadRequest, http.StatusUnprocessableEntity:
+		return "INVALID_REQUEST"
+	case http.StatusUnauthorized:
+		return "UNAUTHORIZED"
+	case http.StatusForbidden:
+		return "TENANT_ACCESS_REVOKED"
+	case http.StatusNotFound:
+		return "NOT_FOUND"
+	case http.StatusConflict:
+		return "FAILED_PRECONDITION"
+	case http.StatusTooManyRequests:
+		return "RESOURCE_EXHAUSTED"
+	default:
+		if status >= 500 {
+			return "INTERNAL"
+		}
+		return "UNKNOWN"
+	}
 }

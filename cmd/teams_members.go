@@ -4,10 +4,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// teams_members.go — members add/remove/list, extracted from teams.go (Phase 4 split).
+
 var teamsMembersCmd = &cobra.Command{Use: "members", Short: "Manage team members"}
 
 var teamsMembersListCmd = &cobra.Command{
-	Use: "list <teamID>", Short: "List team members", Args: cobra.ExactArgs(1),
+	Use:   "list <teamID>",
+	Short: "List team members",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -27,7 +31,9 @@ var teamsMembersListCmd = &cobra.Command{
 }
 
 var teamsMembersAddCmd = &cobra.Command{
-	Use: "add <teamID>", Short: "Add team member", Args: cobra.ExactArgs(1),
+	Use:   "add <teamID>",
+	Short: "Add a member to a team",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -51,7 +57,9 @@ var teamsMembersAddCmd = &cobra.Command{
 }
 
 var teamsMembersRemoveCmd = &cobra.Command{
-	Use: "remove <teamID>", Short: "Remove team member", Args: cobra.ExactArgs(1),
+	Use:   "remove <teamID>",
+	Short: "Remove a member from a team",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ws, err := newWS("cli")
 		if err != nil {
@@ -77,9 +85,9 @@ func init() {
 	teamsMembersAddCmd.Flags().String("agent", "", "Agent ID")
 	teamsMembersAddCmd.Flags().String("role", "member", "Role: lead, member")
 	_ = teamsMembersAddCmd.MarkFlagRequired("agent")
+
 	teamsMembersRemoveCmd.Flags().String("agent", "", "Agent ID")
 	_ = teamsMembersRemoveCmd.MarkFlagRequired("agent")
 
 	teamsMembersCmd.AddCommand(teamsMembersListCmd, teamsMembersAddCmd, teamsMembersRemoveCmd)
-	teamsCmd.AddCommand(teamsMembersCmd)
 }
