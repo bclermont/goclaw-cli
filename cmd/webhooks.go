@@ -50,7 +50,7 @@ var webhooksCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a webhook",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		body, err := webhookBody(cmd)
+		body, err := webhookBody(cmd, false)
 		if err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ var webhooksUpdateCmd = &cobra.Command{
 	Short: "Update a webhook",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		body, err := webhookBody(cmd)
+		body, err := webhookBody(cmd, true)
 		if err != nil {
 			return err
 		}
@@ -131,7 +131,7 @@ var webhooksDeleteCmd = &cobra.Command{
 	},
 }
 
-func webhookBody(cmd *cobra.Command) (map[string]any, error) {
+func webhookBody(cmd *cobra.Command, changedOnly bool) (map[string]any, error) {
 	if raw, _ := cmd.Flags().GetString("body"); raw != "" {
 		var body map[string]any
 		if err := json.Unmarshal([]byte(raw), &body); err != nil {
@@ -139,17 +139,57 @@ func webhookBody(cmd *cobra.Command) (map[string]any, error) {
 		}
 		return body, nil
 	}
-	return buildBody(
-		"name", mustString(cmd, "name"),
-		"target_type", mustString(cmd, "target-type"),
-		"target_id", mustString(cmd, "target-id"),
-		"enabled", mustBool(cmd, "enabled"),
-	), nil
+	body := map[string]any{}
+	addStringFlag(body, cmd, changedOnly, "name", "name")
+	addStringFlag(body, cmd, changedOnly, "kind", "kind")
+	addStringFlag(body, cmd, changedOnly, "agent-id", "agent_id")
+	addStringFlag(body, cmd, changedOnly, "channel-id", "channel_id")
+	addIntFlag(body, cmd, changedOnly, "rate-limit-per-min", "rate_limit_per_min")
+	addBoolFlag(body, cmd, changedOnly, "require-hmac", "require_hmac")
+	addBoolFlag(body, cmd, changedOnly, "localhost-only", "localhost_only")
+	addCSVFlag(body, cmd, changedOnly, "scopes", "scopes")
+	addCSVFlag(body, cmd, changedOnly, "ip-allowlist", "ip_allowlist")
+	return body, nil
 }
 
-func mustBool(cmd *cobra.Command, name string) bool {
-	v, _ := cmd.Flags().GetBool(name)
-	return v
+func addStringFlag(body map[string]any, cmd *cobra.Command, changedOnly bool, flag, key string) {
+	if changedOnly && !cmd.Flags().Changed(flag) {
+		return
+	}
+	v := mustString(cmd, flag)
+	if v != "" || cmd.Flags().Changed(flag) {
+		body[key] = v
+	}
+}
+
+func addIntFlag(body map[string]any, cmd *cobra.Command, changedOnly bool, flag, key string) {
+	if changedOnly && !cmd.Flags().Changed(flag) {
+		return
+	}
+	v, _ := cmd.Flags().GetInt(flag)
+	if v != 0 || cmd.Flags().Changed(flag) {
+		body[key] = v
+	}
+}
+
+func addBoolFlag(body map[string]any, cmd *cobra.Command, changedOnly bool, flag, key string) {
+	if changedOnly && !cmd.Flags().Changed(flag) {
+		return
+	}
+	v, _ := cmd.Flags().GetBool(flag)
+	if v || cmd.Flags().Changed(flag) {
+		body[key] = v
+	}
+}
+
+func addCSVFlag(body map[string]any, cmd *cobra.Command, changedOnly bool, flag, key string) {
+	if changedOnly && !cmd.Flags().Changed(flag) {
+		return
+	}
+	raw := mustString(cmd, flag)
+	if raw != "" || cmd.Flags().Changed(flag) {
+		body[key] = splitCSV(raw)
+	}
 }
 
 func printWebhookSecretResult(result map[string]any) {
@@ -164,10 +204,17 @@ func init() {
 	for _, c := range []*cobra.Command{webhooksCreateCmd, webhooksUpdateCmd} {
 		c.Flags().String("body", "", "Webhook payload JSON object")
 		c.Flags().String("name", "", "Webhook name")
-		c.Flags().String("target-type", "", "Target type")
-		c.Flags().String("target-id", "", "Target ID")
-		c.Flags().Bool("enabled", true, "Whether webhook is enabled")
+		c.Flags().String("kind", "", "Webhook kind: llm or message")
+		c.Flags().String("agent-id", "", "Agent UUID for LLM webhooks")
+		c.Flags().String("channel-id", "", "Channel UUID for message webhooks")
+		c.Flags().String("scopes", "", "Comma-separated webhook scopes")
+		c.Flags().Int("rate-limit-per-min", 0, "Per-webhook rate limit per minute")
+		c.Flags().String("ip-allowlist", "", "Comma-separated allowed IP/CIDR entries")
+		c.Flags().Bool("require-hmac", false, "Require HMAC signatures")
+		c.Flags().Bool("localhost-only", false, "Restrict webhook to localhost callers")
 	}
+	_ = webhooksCreateCmd.MarkFlagRequired("name")
+	_ = webhooksCreateCmd.MarkFlagRequired("kind")
 	webhooksCmd.AddCommand(webhooksListCmd, webhooksGetCmd, webhooksCreateCmd,
 		webhooksUpdateCmd, webhooksRotateCmd, webhooksDeleteCmd)
 	rootCmd.AddCommand(webhooksCmd)

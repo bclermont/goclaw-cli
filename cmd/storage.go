@@ -21,9 +21,11 @@ var storageListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		path := "/v1/storage/files/"
+		path := "/v1/storage/files"
 		if v, _ := cmd.Flags().GetString("path"); v != "" {
-			path += url.PathEscape(v)
+			q := url.Values{}
+			q.Set("path", v)
+			path += "?" + q.Encode()
 		}
 		data, err := c.Get(path)
 		if err != nil {
