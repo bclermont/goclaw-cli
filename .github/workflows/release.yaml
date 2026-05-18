@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
 
 permissions:
   contents: write
@@ -17,10 +17,45 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-      - uses: go-semantic-release/action@v1
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -count=1 ./...
+      - name: Test with race detector
+        run: go test -race -count=1 ./...
+      - name: Configure beta release stream
+        if: github.ref_name == 'dev'
+        shell: bash
+        run: |
+          latest_stable="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)"
+          if [ -z "$latest_stable" ]; then
+            major=0
+            minor=1
+          else
+            version="${latest_stable#v}"
+            IFS='.' read -r major minor patch <<< "$version"
+            minor=$((minor + 1))
+          fi
+          printf '{\n  "maintainedVersion": "%s.%s-beta"\n}\n' "$major" "$minor" > .semrelrc
+          cat .semrelrc
+      - id: semrel
+        uses: go-semantic-release/action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           hooks: goreleaser
           allow-initial-development-versions: true
+          prerelease: ${{ github.ref_name == 'dev' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload generated changelog
+        if: steps.semrel.outputs.version != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.semrel.outputs.version }}
+          RELEASE_CHANGELOG: ${{ steps.semrel.outputs.changelog }}
+        run: |
+          printf '%s\n' "$RELEASE_CHANGELOG" > CHANGELOG.md
+          gh release upload "v${RELEASE_VERSION}" CHANGELOG.md --clobber
