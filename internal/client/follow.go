@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -96,12 +97,19 @@ func followOnce(ctx context.Context, serverURL, token, userID string, insecure b
 
 	// Channel to propagate handler errors or connection done signal
 	errCh := make(chan error, 1)
+	var handlerStopped atomic.Bool
 
 	ws.Subscribe("*", func(e *WSEvent) {
+		if handlerStopped.Load() {
+			return
+		}
 		if err := handler(e); err != nil {
-			select {
-			case errCh <- &handlerErr{err: err}:
-			default:
+			if handlerStopped.CompareAndSwap(false, true) {
+				select {
+				case errCh <- &handlerErr{err: err}:
+				default:
+				}
+				ws.Close()
 			}
 		}
 	})
@@ -118,6 +126,11 @@ func followOnce(ctx context.Context, serverURL, token, userID string, insecure b
 	case err := <-errCh:
 		return err
 	case <-ws.done:
+		select {
+		case err := <-errCh:
+			return err
+		default:
+		}
 		return fmt.Errorf("connection closed unexpectedly")
 	}
 }
