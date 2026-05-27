@@ -1,9 +1,40 @@
 # GoClaw CLI - Project Roadmap
 
-**Last Updated:** 2026-05-19
+**Last Updated:** 2026-05-20
 **Phase Structure:** Legacy Phases 1-9 (bootstrap → CI/CD) + AI-First Expansion Phases 0-5 (2026-04-15)
-**Current Status:** Legacy Phases 1-9 ✓ COMPLETE; P0-P4 ✓ COMPLETE; Super Admin API Parity ✓ COMPLETE; Domain Coverage P3 ✓ COMPLETE
-**Next Phase:** Domain Coverage residuals: P4 UX polish leftovers, then P5 team attachment download + evolution skill apply.
+**Current Status:** Legacy Phases 1-9 ✓ COMPLETE; P0-P4 ✓ COMPLETE; Super Admin API Parity ✓ COMPLETE; Domain Coverage P5 implemented pending release.
+**Next Phase:** Ship Domain Coverage P5 PR to `dev` and verify beta release.
+
+---
+
+## 2026-05-20: Domain Coverage P5 IMPLEMENTED
+
+**Objective:** Close final CLI-only residuals after the P5 sweep without adding server routes.
+
+**Deliverables:**
+- [x] Added `teams attachments download <team-id> <attachment-id> --output <file>` with required output, parent directory creation, no-overwrite default, and `--force`.
+- [x] Added `agents evolution skill apply <agent-id> <suggestion-id> [--skill-draft @file]` as a skill-specific approval wrapper.
+- [x] Fixed `agents evolution update --action=accept|reject` to send server-compatible `status=approved|rejected`.
+- [x] Added focused regression tests for route escaping, auth header, request bodies, file writes, missing output, overwrite guard, output-format preservation, suggestion type guard, and draft override.
+- [x] Synced parent P5 plan and dedicated execution plan.
+
+**Validation:** `/usr/local/go/bin/go build ./...`; `/usr/local/go/bin/go test ./...`; `/usr/local/go/bin/go vet ./...`.
+
+---
+
+## 2026-05-19: Domain Coverage P4 ✓ COMPLETE
+
+**Objective:** Close UX polish residuals after the P4/P5 sweep without adding new server contracts.
+
+**Deliverables:**
+- [x] Added `codex-pool activity --agent|--provider` as the unified Codex pool activity command.
+- [x] Added `api-keys rotate <id>` as a non-atomic create-and-revoke composite with emit-before-revoke partial failure handling.
+- [x] Added `config defaults` via WS RPC `config.defaults`.
+- [x] Added `chat replay <agent> --session=<key>` and `chat sessions resume <agent> --session=<key>` convenience wrappers.
+- [x] Added `tools invoke --args=<json|@file>` alias support.
+- [x] Added focused P4 route/contract tests and synced README, changelog, codebase summary, and plan docs.
+
+**Validation:** `/usr/local/go/bin/go build ./...`; `/usr/local/go/bin/go test ./...`; `/usr/local/go/bin/go vet ./...`.
 
 ---
 
@@ -22,7 +53,7 @@
 
 **Validation:** `go test ./...`.
 
-**Backlog Sweep:** P4/P5 verification on 2026-05-19 removed covered items from future scope: `agents prompt-preview`, `storage size`, `channels writers groups`, `contacts unmerge`, `agents instances`, `mcp servers tools`, `agents evolution update`, and `tts synthesize`.
+**Backlog Sweep:** P4/P5 verification on 2026-05-19 removed covered items from future scope: `agents prompt-preview`, `storage size`, `channels writers groups`, `contacts unmerge`, `agents instances`, `mcp servers tools`, and `tts synthesize`. Follow-up P5 validation on 2026-05-20 found `agents evolution update` existed as a command surface but needed payload compatibility repair.
 
 ---
 
@@ -444,7 +475,6 @@
 
 **Deferred / out of scope:**
 - OpenAI-compatible `/chat/completions` and `/v1/responses` (client APIs)
-- `evolution_skill_apply` (no REST route registered server-side)
 - `hooks history` pagination (server stub returns empty list pending Phase 4)
 
 ---
