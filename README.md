@@ -91,6 +91,51 @@ echo "Analyze this log" | goclaw chat myagent
 | `restore` | System/tenant restore from backup archive |
 | `vault` | Knowledge Vault — documents, links, search, graph, enrichment |
 
+### Backend-Unblocked Surfaces (P6)
+
+Seven one-shot subcommands wired to backend PRs `#37` and `#44`:
+
+```bash
+# Incremental trace polling (one shot; rerun with returned cursor)
+goclaw traces follow --session-key <key> [--since <RFC3339>] [--limit <n>]
+goclaw traces follow --agent <id> [--since <RFC3339>] [--limit <n>]
+
+# Provider hot-reconnect (bumps registry without recreating credentials)
+goclaw providers reconnect <provider-id>
+
+# Branch a chat session at a message index
+goclaw sessions branch <session-key> --up-to-index <N> [--new-session-key <k>] \
+  [--label <l>] [--metadata k=v ...]
+
+# One-shot session-history poll (cursor-based; not a stream)
+goclaw sessions follow <session-key> [--cursor <n>] [--limit <n>]
+
+# Probe a (group, user) pair against a channel's writer policy
+goclaw channels writers test <instance-id> --group-id <g> --user-id <u>
+
+# Aggregate audit-log activity by dimension
+goclaw activity aggregate --group-by <action|actor_type|entity_type|actor_id> \
+  [--from <RFC3339>] [--to <RFC3339>] [--limit <n>] \
+  [--actor-type <v>] [--actor-id <v>] [--action <v>] [--entity-type <v>] [--entity-id <v>]
+
+# Summarize the runtime log ring buffer (NOT a stream — see 'logs tail' for that)
+goclaw logs aggregate [--group-by <level|source>] [--level <l>] [--source <s>] [--from <RFC3339>]
+```
+
+All are one-shot HTTP — no watch loops or WS streams. `logs aggregate` is admin-only on the server; `activity aggregate --group-by actor_id` is also admin-only (server-enforced).
+
+### Reading a Trace by ID
+
+```bash
+# Human-readable: header + span tree + events
+goclaw traces get <trace-id>
+
+# Machine-readable JSON (also auto-selected when stdout is piped)
+goclaw traces get <trace-id> -o json
+```
+
+Exit codes for `traces get`: `0` on success, `2` on permission denied, `3` on not-found, `4` on malformed id (rejected before any HTTP call — allowlist `^[A-Za-z0-9._-]+$`), `5` on upstream server failure, `6` on rate-limit / network-resource exhaustion.
+
 ## Backup & Restore
 
 ### System Backup
