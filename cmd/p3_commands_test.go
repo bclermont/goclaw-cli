@@ -86,26 +86,37 @@ func TestTracesListAddsP3Filters(t *testing.T) {
 			return
 		}
 		q := r.URL.Query()
-		if q.Get("agent_id") != "agent-1" || q.Get("status") != "error" ||
-			q.Get("since") != "1h" || q.Get("root_only") != "true" || q.Get("limit") != "5" {
+		if q.Get("agent_id") != "agent-1" || q.Get("user_id") != "user-1" ||
+			q.Get("session_key") != "session-1" || q.Get("status") != "error" ||
+			q.Get("channel") != "telegram" || q.Get("limit") != "5" ||
+			q.Get("offset") != "10" {
 			t.Fatalf("unexpected query: %s", r.URL.RawQuery)
 		}
-		okJSON(t, w, []map[string]any{{"trace_id": "trace-1"}})
+		rawJSON(t, w, map[string]any{
+			"traces": []map[string]any{{"id": "trace-1"}},
+			"total":  1,
+			"limit":  5,
+			"offset": 10,
+		})
 	}))
 	defer srv.Close()
 	setupP3CommandTest(srv.URL)
 
 	_ = tracesListCmd.Flags().Set("agent", "agent-1")
+	_ = tracesListCmd.Flags().Set("user", "user-1")
+	_ = tracesListCmd.Flags().Set("session-key", "session-1")
 	_ = tracesListCmd.Flags().Set("status", "error")
-	_ = tracesListCmd.Flags().Set("since", "1h")
-	_ = tracesListCmd.Flags().Set("root-only", "true")
+	_ = tracesListCmd.Flags().Set("channel", "telegram")
 	_ = tracesListCmd.Flags().Set("limit", "5")
+	_ = tracesListCmd.Flags().Set("offset", "10")
 	t.Cleanup(func() {
 		_ = tracesListCmd.Flags().Set("agent", "")
+		_ = tracesListCmd.Flags().Set("user", "")
+		_ = tracesListCmd.Flags().Set("session-key", "")
 		_ = tracesListCmd.Flags().Set("status", "")
-		_ = tracesListCmd.Flags().Set("since", "")
-		_ = tracesListCmd.Flags().Set("root-only", "false")
+		_ = tracesListCmd.Flags().Set("channel", "")
 		_ = tracesListCmd.Flags().Set("limit", "20")
+		_ = tracesListCmd.Flags().Set("offset", "0")
 	})
 
 	if err := tracesListCmd.RunE(tracesListCmd, nil); err != nil {

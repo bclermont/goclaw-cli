@@ -97,7 +97,7 @@ goclaw sessions label <session-id> --label "name"
 ```
 goclaw logs [-f]                           # Real-time log tailing
 goclaw chat <agent-id> [interactive]       # Streaming chat
-goclaw traces <trace-id> [--stream]        # Trace streaming
+goclaw traces follow --session-key <key>   # One-shot trace polling
 ```
 
 ### Configuration Management
@@ -296,8 +296,8 @@ goclaw agents list  # Uses custom server/token/output
 ### Channels (3 commands)
 `channels` (list, contacts, pending-messages)
 
-### LLM Traces (2 commands)
-`traces` (list, export)
+### LLM Traces (5 commands)
+`traces` (list, get, export, follow, timeline)
 
 ### Memory Documents (3 commands)
 `memory` (list, search, upsert)
