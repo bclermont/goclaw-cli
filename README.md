@@ -93,7 +93,8 @@ echo "Analyze this log" | goclaw chat myagent
 
 ### Backend-Unblocked Surfaces (P6)
 
-Seven one-shot subcommands wired to backend PRs `#37` and `#44`:
+Backend-unblocked one-shot subcommands wired to backend PRs `#37` and `#44`
+plus the run timeline archive endpoint:
 
 ```bash
 # Paginated trace listing with server-supported filters

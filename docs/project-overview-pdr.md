@@ -92,7 +92,7 @@ goclaw sessions reset <session-id> [-y]
 goclaw sessions label <session-id> --label "name"
 ```
 
-### Streaming Operations
+### Streaming and Polling Operations
 
 ```
 goclaw logs [-f]                           # Real-time log tailing
