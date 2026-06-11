@@ -1,6 +1,6 @@
 # GoClaw CLI - Codebase Summary
 
-**Generated from:** `repomix-output.xml` (2026-04-15), updated manually 2026-05-20
+**Generated from:** `repomix-output.xml` (2026-04-15), updated manually 2026-06-11
 **Phase Status:** P0-P4 Complete (AI-First Expansion); Super Admin API Parity Complete; Domain Coverage P5 + P6 (Backend-Unblocked) Implemented
 **Total Files:** 80+
 **Estimated Tokens:** 80,000+
@@ -10,7 +10,7 @@
 
 ## Overview
 
-GoClaw CLI is a production-ready Go application providing comprehensive command-line management for GoClaw AI agent gateway servers. Built with Cobra framework, it supports 30+ command groups across modular command files with dual modes: interactive (human) and automation (CI/agent). Phases 0-4 (AI-first expansion) add AI ergonomics, admin/ops, migration, vault, and advanced agent/team/memory support. The 2026-05-18 super-admin parity work adds gateway upgrade, package updates, workstations, webhooks, MCP user credentials, secure env reveal, media/TTS/storage/channel fillers, and focused route-contract tests. The 2026-05-19 P3/P4 filler pass adds first-class profile commands, `GOCLAW_PROFILE`, `sessions compact`, WS health, trace filter polish, `codex-pool`, `api-keys rotate`, `config defaults`, chat session convenience wrappers, and `tools invoke --args`. The 2026-05-20 P5 filler pass adds team attachment download, skill-specific evolution suggestion apply, and fixes evolution update payload compatibility. The 2026-05-27 P6 backend-unblocked pass adds seven new surfaces wired to backend PRs `#37` and `#44`: `traces follow`, `providers reconnect`, `sessions branch`, `sessions follow`, `channels writers test`, `activity aggregate`, and `logs aggregate` — all one-shot HTTP commands (no new watch loops; reuse the existing `client.FollowStream` only for true streaming surfaces).
+GoClaw CLI is a production-ready Go application providing comprehensive command-line management for GoClaw AI agent gateway servers. Built with Cobra framework, it supports 30+ command groups across modular command files with dual modes: interactive (human) and automation (CI/agent). Phases 0-4 (AI-first expansion) add AI ergonomics, admin/ops, migration, vault, and advanced agent/team/memory support. The 2026-05-18 super-admin parity work adds gateway upgrade, package updates, workstations, webhooks, MCP user credentials, secure env reveal, media/TTS/storage/channel fillers, and focused route-contract tests. The 2026-05-19 P3/P4 filler pass adds first-class profile commands, `GOCLAW_PROFILE`, `sessions compact`, WS health, trace filter polish, `codex-pool`, `api-keys rotate`, `config defaults`, chat session convenience wrappers, and `tools invoke --args`. The 2026-05-20 P5 filler pass adds team attachment download, skill-specific evolution suggestion apply, and fixes evolution update payload compatibility. The 2026-05-27 P6 backend-unblocked pass adds seven new surfaces wired to backend PRs `#37` and `#44`: `traces follow`, `providers reconnect`, `sessions branch`, `sessions follow`, `channels writers test`, `activity aggregate`, and `logs aggregate` — all one-shot HTTP commands (no new watch loops; reuse the existing `client.FollowStream` only for true streaming surfaces). The 2026-06-11 traces contract pass aligns `traces list/get/follow/export` with server `dev` envelopes and adds `traces timeline`.
 
 **Key Metrics:**
 - **70+ command files** in `cmd/` (modularized for maintainability)
@@ -54,7 +54,7 @@ All files follow Cobra pattern: root command + subcommands.
 | `cron.go` | `cron` (list/create/delete/trigger) | 220+ | Scheduled job management |
 | `teams.go` | `teams` (list/create/members) | 270+ | Team management (largest file) |
 | `channels.go` | `channels` (list/contacts) | 200+ | Channel management |
-| `traces.go` | `traces` (list/export + filters) | 180+ | LLM trace viewing |
+| `traces.go`, `traces_follow.go`, `traces_timeline.go` | `traces` (list/get/export/follow/timeline) | modular | LLM trace and run timeline viewing |
 | `memory.go` | `memory` (list/search/upsert) | 180+ | Memory document management |
 | `config_cmd.go` | `config` (get/apply/patch/permissions) | 230+ | Server config + permissions |
 | `logs.go` | `logs` | 120+ | Real-time log streaming |
@@ -316,7 +316,7 @@ goclaw (root)
 │   ├── workspace (list, read, delete, upload, move)
 │   └── attachments download <team-id> <attachment-id> --output <file>
 ├── channels (list, contacts, pending-messages)
-├── traces (list, get, export, follow)              # `get` validates id allowlist, renders header+span-tree+events for TTY, JSON for piped/`-o json`
+├── traces (list, get, export, follow, timeline)    # server-shaped envelopes, validated IDs, table renderers for traces/spans/timeline
 ├── memory (list, search, upsert)
 ├── knowledge-graph (entities, links, query)
 ├── usage (summary, detail, costs, timeseries, breakdown)
@@ -472,7 +472,7 @@ Each level overrides the previous.
 - Multiple profiles in `~/.goclaw/config.yaml`
 - Set active via `goclaw profile use <profile>` or legacy `goclaw auth use-context <profile>`
 - Override per-command: `goclaw --profile staging agents list`
-- Env override: `GOCLAW_PROFILE=staging goclaw traces list --since=1h`
+- Env override: `GOCLAW_PROFILE=staging goclaw traces list --session-key=session-1 --channel=telegram`
 
 ### Automation Mode
 - Flags: `--yes` (skip prompts), `--output json` (machine output), `--verbose` (debug)

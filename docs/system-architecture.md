@@ -174,7 +174,7 @@ WebSocket Stream (Bidirectional)
 **Commands Using WebSocket:**
 - `goclaw chat` (interactive mode)
 - `goclaw logs` (real-time tailing with -f)
-- `goclaw traces` (live trace streaming)
+- Trace commands use HTTP one-shot reads/polling; `traces follow` is not a WebSocket stream.
 
 #### Authentication (auth.go)
 

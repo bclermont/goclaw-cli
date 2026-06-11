@@ -48,7 +48,7 @@
 - [x] Added legacy single-profile config migration that removes token from config.yaml.
 - [x] Added `sessions compact <key>` via WS RPC `sessions.compact`.
 - [x] Updated `health` to use WS RPC `health` when authenticated, with HTTP fallback.
-- [x] Added `traces list --since --root-only` on top of existing agent/status/limit filters.
+- [x] Added `traces list --agent --user --session-key --status --channel --limit --offset` aligned with the server trace list contract.
 - [x] Added focused tests for profile, migration, session compact, health, and traces filters.
 
 **Validation:** `go test ./...`.
@@ -250,6 +250,9 @@
 **Deliverables:**
 - [x] `goclaw traces list` (LLM traces)
 - [x] `goclaw traces export` (export traces)
+- [x] `goclaw traces get` (trace detail with span tree)
+- [x] `goclaw traces follow` (one-shot incremental polling)
+- [x] `goclaw traces timeline` (read archived run timeline)
 - [x] `goclaw memory list` (memory documents)
 - [x] `goclaw memory search` (semantic search)
 - [x] `goclaw memory upsert` (create/update)

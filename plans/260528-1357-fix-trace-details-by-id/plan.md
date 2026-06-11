@@ -11,7 +11,8 @@ tags:
   - traces
   - ai-ergonomics
   - tdd
-blockedBy: []
+blockedBy:
+  - 260611-2303-complete-traces-cli-contract
 blocks: []
 created: '2026-05-28T06:58:02.755Z'
 createdBy: 'ck:plan'
@@ -76,7 +77,8 @@ Each phase opens with red tests describing the desired behavior, then implementa
 
 ## Dependencies
 
-None. P6 (HEAD = `2801486`) provides all required prerequisite surfaces.
+- Superseded by `../260611-2303-complete-traces-cli-contract/plan.md` for implementation. The older issue #17 plan used/allowed a flat trace fixture; the newer plan locks the current server `dev` contract `{trace,spans}` plus trace list/timeline gaps.
+- P6 (HEAD = `2801486`) provided the original prerequisite surfaces, but current contract truth is `digitopvn/goclaw` `dev` as of 2026-06-11.
 
 ## Risk and rollback
 

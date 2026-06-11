@@ -93,12 +93,20 @@ echo "Analyze this log" | goclaw chat myagent
 
 ### Backend-Unblocked Surfaces (P6)
 
-Seven one-shot subcommands wired to backend PRs `#37` and `#44`:
+Backend-unblocked one-shot subcommands wired to backend PRs `#37` and `#44`
+plus the run timeline archive endpoint:
 
 ```bash
+# Paginated trace listing with server-supported filters
+goclaw traces list [--agent <id>] [--user <id>] [--session-key <key>] \
+  [--status <status>] [--channel <name>] [--limit <n>] [--offset <n>]
+
 # Incremental trace polling (one shot; rerun with returned cursor)
 goclaw traces follow --session-key <key> [--since <RFC3339>] [--limit <n>]
 goclaw traces follow --agent <id> [--since <RFC3339>] [--limit <n>]
+
+# Archived run timeline (read-only)
+goclaw traces timeline <run-id> [--session-key <key>] [--limit <n>] [--offset <n>]
 
 # Provider hot-reconnect (bumps registry without recreating credentials)
 goclaw providers reconnect <provider-id>
@@ -127,11 +135,14 @@ All are one-shot HTTP — no watch loops or WS streams. `logs aggregate` is admi
 ### Reading a Trace by ID
 
 ```bash
-# Human-readable: header + span tree + events
+# Human-readable: header + span tree
 goclaw traces get <trace-id>
 
 # Machine-readable JSON (also auto-selected when stdout is piped)
 goclaw traces get <trace-id> -o json
+
+# Export gzipped trace tree
+goclaw traces export <trace-id> --output trace.json.gz
 ```
 
 Exit codes for `traces get`: `0` on success, `2` on permission denied, `3` on not-found, `4` on malformed id (rejected before any HTTP call — allowlist `^[A-Za-z0-9._-]+$`), `5` on upstream server failure, `6` on rate-limit / network-resource exhaustion.
@@ -475,7 +486,7 @@ One-shot profile override:
 
 ```bash
 goclaw --profile staging agents list
-GOCLAW_PROFILE=staging goclaw traces list --since=1h --root-only -o json
+GOCLAW_PROFILE=staging goclaw traces list --session-key=session-1 --channel=telegram -o json
 ```
 
 ## Claude Code Skill
