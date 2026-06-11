@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/nextlevelbuilder/goclaw-cli/internal/client"
-	"github.com/nextlevelbuilder/goclaw-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -28,17 +27,29 @@ var tracesListCmd = &cobra.Command{
 		if v, _ := cmd.Flags().GetString("agent"); v != "" {
 			q.Set("agent_id", v)
 		}
+		if v, _ := cmd.Flags().GetString("user"); v != "" {
+			q.Set("user_id", v)
+		}
+		if v, _ := cmd.Flags().GetString("session-key"); v != "" {
+			q.Set("session_key", v)
+		}
 		if v, _ := cmd.Flags().GetString("status"); v != "" {
 			q.Set("status", v)
 		}
-		if v, _ := cmd.Flags().GetString("since"); v != "" {
-			q.Set("since", v)
-		}
-		if v, _ := cmd.Flags().GetBool("root-only"); v {
-			q.Set("root_only", "true")
+		if v, _ := cmd.Flags().GetString("channel"); v != "" {
+			q.Set("channel", v)
 		}
 		if v, _ := cmd.Flags().GetInt("limit"); v > 0 {
 			q.Set("limit", fmt.Sprintf("%d", v))
+		}
+		if v, _ := cmd.Flags().GetInt("offset"); v > 0 {
+			q.Set("offset", fmt.Sprintf("%d", v))
+		}
+		if cmd.Flags().Changed("since") {
+			return &client.APIError{Code: "INVALID_REQUEST", Message: "traces list no longer supports --since; use traces follow --since for incremental polling"}
+		}
+		if cmd.Flags().Changed("root-only") {
+			return &client.APIError{Code: "INVALID_REQUEST", Message: "traces list no longer supports --root-only; the server trace list has no root-only filter"}
 		}
 		path := "/v1/traces"
 		if len(q) > 0 {
@@ -48,16 +59,15 @@ var tracesListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		envelope, rows, err := decodeTraceListPayload(data)
+		if err != nil {
+			return err
+		}
 		if cfg.OutputFormat != "table" {
-			printer.Print(unmarshalList(data))
+			printer.Print(envelope)
 			return nil
 		}
-		tbl := output.NewTable("TRACE_ID", "AGENT", "STATUS", "DURATION_MS", "INPUT_TOKENS", "OUTPUT_TOKENS", "COST")
-		for _, t := range unmarshalList(data) {
-			tbl.AddRow(str(t, "trace_id"), str(t, "agent_id"), str(t, "status"),
-				str(t, "duration_ms"), str(t, "input_tokens"), str(t, "output_tokens"), str(t, "cost"))
-		}
-		printer.Print(tbl)
+		printTraceRowsTable(rows)
 		return nil
 	},
 }
@@ -77,15 +87,15 @@ var tracesGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var trace map[string]any
-		if err := json.Unmarshal(data, &trace); err != nil {
+		var payload map[string]any
+		if err := json.Unmarshal(data, &payload); err != nil {
 			return fmt.Errorf("decode trace payload: %w", err)
 		}
 		if cfg.OutputFormat != "table" {
-			printer.Print(trace)
+			printer.Print(payload)
 			return nil
 		}
-		renderTraceTable(trace, os.Stdout)
+		renderTraceTable(payload, os.Stdout)
 		return nil
 	},
 }
@@ -105,104 +115,27 @@ func validateTraceID(id string) error {
 	return nil
 }
 
-// renderTraceTable prints a human-readable summary: header card, span tree, events.
-func renderTraceTable(t map[string]any, w io.Writer) {
-	for _, row := range [][2]string{
-		{"TRACE_ID", str(t, "trace_id")}, {"AGENT_ID", str(t, "agent_id")},
-		{"SESSION_KEY", str(t, "session_key")}, {"STATUS", str(t, "status")},
-		{"DURATION_MS", str(t, "duration_ms")},
-	} {
-		if row[1] != "" {
-			fmt.Fprintf(w, "%-12s %s\n", row[0]+":", row[1])
-		}
-	}
-	if in, out, cost := str(t, "input_tokens"), str(t, "output_tokens"), str(t, "cost"); in+out+cost != "" {
-		fmt.Fprintf(w, "%-12s in=%s out=%s cost=%s\n", "TOKENS:", in, out, cost)
-	}
-	spans, _ := t["spans"].([]any)
-	if len(spans) == 0 {
-		fmt.Fprintln(w, "\nSPANS: (none)")
-	} else {
-		fmt.Fprintln(w, "\nSPANS:")
-		output.PrintTreeRoot(buildSpanTree(spans), w)
-	}
-	events, _ := t["events"].([]any)
-	fmt.Fprintf(w, "\nEVENTS (n=%d):\n", len(events))
-	for _, e := range events {
-		if m, ok := e.(map[string]any); ok {
-			fmt.Fprintf(w, "  - %s\n", str(m, "type"))
-		}
-	}
-}
-
-// buildSpanTree links spans via parent_span_id; spans whose parent isn't in this
-// trace attach to a virtual root. Children are kept in insertion order.
-func buildSpanTree(spans []any) output.TreeNode {
-	order := make([]string, 0, len(spans))
-	labels := make(map[string]string, len(spans))
-	children := make(map[string][]string, len(spans))
-	parentOf := make(map[string]string, len(spans))
-	for _, s := range spans {
-		m, ok := s.(map[string]any)
-		if !ok {
-			continue
-		}
-		id := str(m, "span_id")
-		if id == "" {
-			continue
-		}
-		label := id
-		if name := str(m, "name"); name != "" {
-			label = name + " [" + id + "]"
-		}
-		if kind := str(m, "kind"); kind != "" {
-			label += " kind=" + kind
-		}
-		if dur := str(m, "duration_ms"); dur != "" {
-			label += " " + dur + "ms"
-		}
-		labels[id] = label
-		order = append(order, id)
-		parentOf[id], _ = m["parent_span_id"].(string)
-	}
-	for _, id := range order {
-		if p := parentOf[id]; p != "" {
-			if _, ok := labels[p]; ok {
-				children[p] = append(children[p], id)
-				continue
-			}
-		}
-		children[""] = append(children[""], id)
-	}
-	var build func(id string) output.TreeNode
-	build = func(id string) output.TreeNode {
-		n := output.TreeNode{Name: labels[id]}
-		for _, c := range children[id] {
-			n.Children = append(n.Children, build(c))
-		}
-		return n
-	}
-	root := output.TreeNode{Name: "trace"}
-	for _, id := range children[""] {
-		root.Children = append(root.Children, build(id))
-	}
-	return root
-}
-
 var tracesExportCmd = &cobra.Command{
 	Use: "export <traceID>", Short: "Export trace to file", Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		id := strings.TrimSpace(args[0])
+		if err := validateTraceID(id); err != nil {
+			return err
+		}
 		c, err := newHTTP()
 		if err != nil {
 			return err
 		}
 		outFile, _ := cmd.Flags().GetString("output")
 		if outFile == "" {
-			outFile = args[0] + ".json.gz"
+			outFile = id + ".json.gz"
 		}
-		resp, err := c.GetRaw("/v1/traces/" + args[0] + "/export")
+		resp, err := c.GetRaw("/v1/traces/" + url.PathEscape(id) + "/export")
 		if err != nil {
 			return err
+		}
+		if resp.StatusCode >= 400 {
+			return rawResponseError(resp)
 		}
 		defer resp.Body.Close()
 		f, err := os.Create(outFile)
@@ -371,10 +304,16 @@ func normalizeUsageTimestamp(v string) string {
 
 func init() {
 	tracesListCmd.Flags().String("agent", "", "Filter by agent ID")
+	tracesListCmd.Flags().String("user", "", "Filter by user ID")
+	tracesListCmd.Flags().String("session-key", "", "Filter by session key")
 	tracesListCmd.Flags().String("status", "", "Filter: running, success, error")
-	tracesListCmd.Flags().String("since", "", "Filter by relative or ISO timestamp, e.g. 1h or 2026-05-19T00:00:00Z")
-	tracesListCmd.Flags().Bool("root-only", false, "Only show root traces")
+	tracesListCmd.Flags().String("channel", "", "Filter by channel")
 	tracesListCmd.Flags().Int("limit", 20, "Max results")
+	tracesListCmd.Flags().Int("offset", 0, "Pagination offset")
+	tracesListCmd.Flags().String("since", "", "Deprecated: use traces follow --since")
+	tracesListCmd.Flags().Bool("root-only", false, "Deprecated: unsupported by server trace list")
+	_ = tracesListCmd.Flags().MarkHidden("since")
+	_ = tracesListCmd.Flags().MarkHidden("root-only")
 	tracesExportCmd.Flags().StringP("output", "f", "", "Output file (default: <traceID>.json.gz)")
 
 	usageSummaryCmd.Flags().String("from", "", "Start date (YYYY-MM-DD)")

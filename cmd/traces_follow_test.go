@@ -126,7 +126,7 @@ func TestTracesFollow_JSONPreservesEnvelope(t *testing.T) {
 	t.Cleanup(func() { resetTracesFollowFlags(t) })
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		okJSON(t, w, map[string]any{
-			"traces":            []map[string]any{{"trace_id": "t1"}},
+			"traces":            []map[string]any{{"id": "t1"}},
 			"spans_by_trace_id": map[string]any{"t1": []any{}},
 			"next_since":        "2026-05-27T13:00:00Z",
 			"server_time":       "2026-05-27T12:30:00Z",
@@ -154,7 +154,7 @@ func TestTracesFollow_TableHeaders(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		okJSON(t, w, map[string]any{
 			"traces": []map[string]any{
-				{"trace_id": "t1", "agent_id": "agent-1", "status": "success", "duration_ms": 120, "input_tokens": 50, "output_tokens": 30, "cost": "0.001"},
+				{"id": "t1", "agent_id": "agent-1", "status": "completed", "duration_ms": 120, "total_input_tokens": 50, "total_output_tokens": 30, "total_cost": "0.001"},
 			},
 		})
 	}))
@@ -169,9 +169,12 @@ func TestTracesFollow_TableHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("traces follow: %v", err)
 	}
-	headerRE := regexp.MustCompile(`TRACE_ID.*AGENT.*STATUS.*DURATION_MS.*INPUT_TOKENS.*OUTPUT_TOKENS.*COST`)
+	headerRE := regexp.MustCompile(`ID.*AGENT.*STATUS.*DURATION_MS.*TOTAL_INPUT_TOKENS.*TOTAL_OUTPUT_TOKENS.*TOTAL_COST`)
 	if !headerRE.MatchString(out) {
 		t.Fatalf("table headers missing in:\n%s", out)
+	}
+	if !strings.Contains(out, "t1") || !strings.Contains(out, "completed") || !strings.Contains(out, "0.001") {
+		t.Fatalf("table row missing server-shaped fields:\n%s", out)
 	}
 }
 

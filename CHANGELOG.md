@@ -32,7 +32,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `GOCLAW_PROFILE` — per-command profile selection precedence between `--profile` and active config.
 - `goclaw sessions compact <key>` — invokes WS RPC `sessions.compact` behind destructive confirmation.
 - `goclaw health` — uses WS RPC `health` when authenticated, retaining unauthenticated HTTP `/health` fallback.
-- `goclaw traces list --since --agent --status --root-only --limit` — expanded filters for automation-friendly trace search.
+- `goclaw traces list --agent --user --session-key --status --channel --limit --offset` — server-aligned filters for paginated trace listing.
 
 **P4 — UX polish**
 - `goclaw codex-pool activity --agent=<id>|--provider=<id>` — unified Codex pool activity lookup; legacy agent/provider commands remain as deprecated aliases.
@@ -48,6 +48,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 **P6 — Backend-unblocked surfaces (gateway `v3.12.0-beta.20`+)**
 - `goclaw traces follow --session-key|--agent [--since RFC3339] [--limit N]` — one-shot incremental trace polling (`GET /v1/traces/follow`). Re-invoke with returned cursor to advance; no WS stream, no watch loop.
+- `goclaw traces timeline <run-id> [--session-key K] [--limit N] [--offset N]` — read archived run timeline items (`GET /v1/runs/{runID}/timeline`) without replaying or mutating a run.
 - `goclaw providers reconnect <provider-id>` — hot-reconnect a provider, bumping the registry without touching credentials (`POST /v1/providers/{id}/reconnect`).
 - `goclaw sessions branch <session-key> --up-to-index N [--new-session-key K] [--label L] [--metadata k=v ...]` — branch a chat session at a 1-based message index into a new session (`POST /v1/chat/sessions/{key}/branch`). `--up-to-index=0` is preserved on the wire.
 - `goclaw sessions follow <session-key> [--cursor N] [--limit N]` — one-shot cursor-based history poll (`GET /v1/chat/sessions/{key}/history/follow`). Not a stream; `--cursor=0` is preserved literally in the query string.
@@ -57,7 +58,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- `goclaw traces get <id>` — TTY mode now renders a human-readable summary (header card + span tree + events list) instead of dumping raw JSON. JSON-mode payload unchanged. Decode failures surface as wrapped errors instead of an empty `{}`. Trace ids are validated against `^[A-Za-z0-9._-]+$` and reserved tokens (`.`, `..`) are rejected before any HTTP call. Distinct exit codes per failure: not-found → 3, permission-denied → 2, malformed-id → 4, server-failure → 5. Latent retry-body bug in `internal/client/http.go` fixed: the final 5xx/429 response body is now preserved so the typed `APIError` reaches the caller (previously collapsed to exit 1). Closes #17.
+- `goclaw traces list` now decodes the current server payload `{traces,total,limit,offset}`. JSON/YAML mode preserves that envelope; table mode renders rows from `traces` using `id`, `total_input_tokens`, `total_output_tokens`, and `total_cost`.
+- `goclaw traces get <id>` — TTY mode now renders a human-readable summary (header card + span tree) instead of dumping raw JSON. JSON-mode payload unchanged. Decode failures surface as wrapped errors instead of an empty `{}`. Trace ids are validated against `^[A-Za-z0-9._-]+$` and reserved tokens (`.`, `..`) are rejected before any HTTP call. Distinct exit codes per failure: not-found → 3, permission-denied → 2, malformed-id → 4, server-failure → 5. Latent retry-body bug in `internal/client/http.go` fixed: the final 5xx/429 response body is now preserved so the typed `APIError` reaches the caller (previously collapsed to exit 1). Closes #17.
+- `goclaw traces get <id>` now handles the current server detail payload `{trace,spans}` while preserving the server envelope in JSON/YAML mode.
+- `goclaw traces export <id>` now validates trace IDs and path-escapes the export route before making the HTTP request.
 
 ### Notes
 - All new commands honor the AI-first ergonomics contract: `--output=json` envelope, central error handler, `--yes` for destructive ops, `--quiet` for CI.

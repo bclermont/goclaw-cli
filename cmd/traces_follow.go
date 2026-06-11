@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/nextlevelbuilder/goclaw-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -76,16 +75,7 @@ polling request — no watch loop. Use the returned ` + "`next_since`" + ` to re
 			return nil
 		}
 		traces, _ := envelope["traces"].([]any)
-		tbl := output.NewTable("TRACE_ID", "AGENT", "STATUS", "DURATION_MS", "INPUT_TOKENS", "OUTPUT_TOKENS", "COST")
-		for _, raw := range traces {
-			t, ok := raw.(map[string]any)
-			if !ok {
-				continue
-			}
-			tbl.AddRow(str(t, "trace_id"), str(t, "agent_id"), str(t, "status"),
-				str(t, "duration_ms"), str(t, "input_tokens"), str(t, "output_tokens"), str(t, "cost"))
-		}
-		printer.Print(tbl)
+		printTraceRowsTable(traces)
 		return nil
 	},
 }

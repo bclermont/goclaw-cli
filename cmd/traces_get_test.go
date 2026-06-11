@@ -12,8 +12,8 @@ import (
 	"github.com/nextlevelbuilder/goclaw-cli/internal/output"
 )
 
-// loadTraceDetailFixture reads the captured trace detail envelope from testdata.
-// The fixture is a single trace map (not wrapped). Tests wrap it via okJSON.
+// loadTraceDetailFixture reads the server-shaped trace detail payload from testdata.
+// The fixture matches GET /v1/traces/{traceID}: {"trace": {...}, "spans": [...]}.
 func loadTraceDetailFixture(t *testing.T) map[string]any {
 	t.Helper()
 	data, err := os.ReadFile("testdata/trace_detail_get.json")
@@ -47,7 +47,7 @@ func TestTracesGet_PathAndMethod(t *testing.T) {
 		atomic.AddInt64(&calls, 1)
 		gotPath = r.URL.Path
 		gotMethod = r.Method
-		okJSON(t, w, loadTraceDetailFixture(t))
+		rawJSON(t, w, loadTraceDetailFixture(t))
 	}))
 	defer srv.Close()
 	t.Setenv("GOCLAW_SERVER", srv.URL)
@@ -71,7 +71,7 @@ func TestTracesGet_PathAndMethod(t *testing.T) {
 func TestTracesGet_HappyPath_JSON_LocksFixture(t *testing.T) {
 	fixture := loadTraceDetailFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		okJSON(t, w, fixture)
+		rawJSON(t, w, fixture)
 	}))
 	defer srv.Close()
 	t.Setenv("GOCLAW_SERVER", srv.URL)
@@ -87,14 +87,18 @@ func TestTracesGet_HappyPath_JSON_LocksFixture(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("stdout is not JSON: %v\nstdout: %q", err, out)
 	}
-	if got["trace_id"] != "trace_FIXTURE_001" {
-		t.Errorf("trace_id = %v", got["trace_id"])
+	trace, ok := got["trace"].(map[string]any)
+	if !ok {
+		t.Fatalf("trace object missing: %#v", got)
 	}
-	if got["agent_id"] != "agent_FIXTURE_001" {
-		t.Errorf("agent_id = %v", got["agent_id"])
+	if trace["id"] != "trace_FIXTURE_001" {
+		t.Errorf("trace.id = %v", trace["id"])
 	}
-	if got["status"] != "success" {
-		t.Errorf("status = %v", got["status"])
+	if trace["agent_id"] != "agent_FIXTURE_001" {
+		t.Errorf("trace.agent_id = %v", trace["agent_id"])
+	}
+	if trace["status"] != "completed" {
+		t.Errorf("trace.status = %v", trace["status"])
 	}
 	spans, ok := got["spans"].([]any)
 	if !ok || len(spans) != 3 {
@@ -106,7 +110,7 @@ func TestTracesGet_HappyPath_JSON_LocksFixture(t *testing.T) {
 func TestTracesGet_TableMode_HumanReadable_RED(t *testing.T) {
 	fixture := loadTraceDetailFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		okJSON(t, w, fixture)
+		rawJSON(t, w, fixture)
 	}))
 	defer srv.Close()
 	t.Setenv("GOCLAW_SERVER", srv.URL)
@@ -122,7 +126,7 @@ func TestTracesGet_TableMode_HumanReadable_RED(t *testing.T) {
 	if strings.HasPrefix(trimmed, "{") {
 		t.Fatalf("table mode rendered raw JSON (starts with '{'): %q", out)
 	}
-	wantAny := []string{"TRACE", "SPAN", "EVENT", "trace_id", "agent_id"}
+	wantAny := []string{"TRACE", "SPAN", "trace_FIXTURE_001", "agent_FIXTURE_001"}
 	hit := false
 	for _, m := range wantAny {
 		if strings.Contains(out, m) {
@@ -139,7 +143,7 @@ func TestTracesGet_TableMode_HumanReadable_RED(t *testing.T) {
 func TestTracesGet_TableMode_HasHeaderAndSpanMarkers(t *testing.T) {
 	fixture := loadTraceDetailFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		okJSON(t, w, fixture)
+		rawJSON(t, w, fixture)
 	}))
 	defer srv.Close()
 	t.Setenv("GOCLAW_SERVER", srv.URL)
@@ -157,12 +161,18 @@ func TestTracesGet_TableMode_HasHeaderAndSpanMarkers(t *testing.T) {
 	if !strings.Contains(out, "TRACE_ID") {
 		t.Errorf("missing TRACE_ID header in: %q", out)
 	}
+	if !strings.Contains(out, "RUN_ID") || !strings.Contains(out, "run_FIXTURE_001") {
+		t.Errorf("missing RUN_ID header/value in: %q", out)
+	}
+	if !strings.Contains(out, "TOTAL_INPUT_TOKENS") || !strings.Contains(out, "TOTAL_OUTPUT_TOKENS") {
+		t.Errorf("missing total token fields in: %q", out)
+	}
 	// At least one tree connector must appear (├─ or └─).
 	if !strings.Contains(out, "├") && !strings.Contains(out, "└") {
 		t.Errorf("missing span tree connectors (├ / └) in: %q", out)
 	}
-	if !strings.Contains(out, "EVENTS") {
-		t.Errorf("missing EVENTS section in: %q", out)
+	if !strings.Contains(out, "span_002") || !strings.Contains(out, "span_type=llm") {
+		t.Errorf("span tree should use server id/span_type fields in: %q", out)
 	}
 }
 
@@ -170,7 +180,7 @@ func TestTracesGet_TableMode_HasHeaderAndSpanMarkers(t *testing.T) {
 func TestTracesGet_JSONMode_PreservesStructure(t *testing.T) {
 	fixture := loadTraceDetailFixture(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		okJSON(t, w, fixture)
+		rawJSON(t, w, fixture)
 	}))
 	defer srv.Close()
 	t.Setenv("GOCLAW_SERVER", srv.URL)
