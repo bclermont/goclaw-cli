@@ -23,9 +23,9 @@ type WSClient struct {
 	insecure  bool
 
 	nextID    atomic.Int64
-	mu        sync.Mutex   // protects pending and listeners
-	writeMu   sync.Mutex   // protects concurrent writes (gorilla requirement)
-	closeOnce sync.Once    // guards Close against concurrent readLoop + caller invocation
+	mu        sync.Mutex // protects pending and listeners
+	writeMu   sync.Mutex // protects concurrent writes (gorilla requirement)
+	closeOnce sync.Once  // guards Close against concurrent readLoop + caller invocation
 	pending   map[string]chan *WSResponse
 	listeners map[string][]func(*WSEvent)
 	done      chan struct{}

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/nextlevelbuilder/goclaw-cli/internal/client"
+	"github.com/nextlevelbuilder/goclaw-cli/client"
 	"github.com/nextlevelbuilder/goclaw-cli/internal/output"
 	"github.com/nextlevelbuilder/goclaw-cli/internal/tui"
 	"github.com/spf13/cobra"
