@@ -176,7 +176,7 @@ Example:
 		}
 		defer ws.Close()
 		data, err := ws.Call("teams.tasks.active-by-session", map[string]any{
-			"session_key": session,
+			"sessionKey": session,
 		})
 		if err != nil {
 			return err
